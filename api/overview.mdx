@@ -8,7 +8,7 @@ description: 'Currency Exchange API reference and getting started guide'
 All API endpoints are relative to your server's base URL:
 
 ```
-http://localhost:5000/api
+http://localhost:8080/api
 ```
 
 ## Authentication
@@ -54,11 +54,15 @@ Errors return appropriate HTTP status codes with error details:
 </ResponseField>
 
 <ResponseField name="400" type="Bad Request">
-  Invalid request parameters or validation error
+  Invalid request parameters or validation error (ArgumentException)
 </ResponseField>
 
 <ResponseField name="404" type="Not Found">
   Requested resource not found
+</ResponseField>
+
+<ResponseField name="409" type="Conflict">
+  Operation conflict, such as unable to find or create an exchange rate (InvalidOperationException)
 </ResponseField>
 
 <ResponseField name="500" type="Internal Server Error">

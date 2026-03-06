@@ -7,7 +7,7 @@ description: 'Convert amounts between currencies using current exchange rates'
 
 <CodeGroup>
 ```bash GET /api/Exchange/from={baseCurrencyCode}&to={targetCurrencyCode}&amount={amount}
-curl "http://localhost:5000/api/Exchange/from=USD&to=EUR&amount=100"
+curl "http://localhost:8080/api/Exchange/from=USD&to=EUR&amount=100"
 ```
 </CodeGroup>
 
@@ -103,17 +103,17 @@ The API uses an intelligent exchange rate resolution system with three strategie
 
 **Convert USD to EUR:**
 ```bash
-curl "http://localhost:5000/api/Exchange/from=USD&to=EUR&amount=100"
+curl "http://localhost:8080/api/Exchange/from=USD&to=EUR&amount=100"
 ```
 
 **Convert EUR to GBP:**
 ```bash
-curl "http://localhost:5000/api/Exchange/from=EUR&to=GBP&amount=50"
+curl "http://localhost:8080/api/Exchange/from=EUR&to=GBP&amount=50"
 ```
 
 **Convert with decimal amount:**
 ```bash
-curl "http://localhost:5000/api/Exchange/from=USD&to=JPY&amount=99.99"
+curl "http://localhost:8080/api/Exchange/from=USD&to=JPY&amount=99.99"
 ```
 
 ### Conversion Logic
@@ -173,7 +173,7 @@ For example:
 When a direct exchange rate exists between two currencies:
 
 ```bash
-curl "http://localhost:5000/api/Exchange/from=USD&to=EUR&amount=250"
+curl "http://localhost:8080/api/Exchange/from=USD&to=EUR&amount=250"
 ```
 
 Response:
@@ -202,7 +202,7 @@ Response:
 When only the reverse rate exists (e.g., EUR→USD exists, but you need USD→EUR):
 
 ```bash
-curl "http://localhost:5000/api/Exchange/from=EUR&to=USD&amount=100"
+curl "http://localhost:8080/api/Exchange/from=EUR&to=USD&amount=100"
 ```
 
 The system automatically calculates the reverse rate.
@@ -212,7 +212,7 @@ The system automatically calculates the reverse rate.
 When no direct or reverse rate exists, the system uses intermediate currencies:
 
 ```bash
-curl "http://localhost:5000/api/Exchange/from=GBP&to=JPY&amount=50"
+curl "http://localhost:8080/api/Exchange/from=GBP&to=JPY&amount=50"
 ```
 
 The system might convert GBP→USD→JPY automatically.

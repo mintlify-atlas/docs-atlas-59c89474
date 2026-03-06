@@ -7,7 +7,7 @@ description: 'Manage exchange rates between currency pairs'
 
 <CodeGroup>
 ```bash GET /api/ExchangeRate
-curl http://localhost:5000/api/ExchangeRate
+curl http://localhost:8080/api/ExchangeRate
 ```
 </CodeGroup>
 
@@ -96,7 +96,7 @@ Retrieves all exchange rates configured in the system.
 
 <CodeGroup>
 ```bash GET /api/ExchangeRate/{searchString}
-curl http://localhost:5000/api/ExchangeRate/USD
+curl http://localhost:8080/api/ExchangeRate/USD
 ```
 </CodeGroup>
 
@@ -159,7 +159,7 @@ Searches for exchange rates matching the provided search string. The search matc
 
 <CodeGroup>
 ```bash POST /api/ExchangeRate
-curl -X POST http://localhost:5000/api/ExchangeRate \
+curl -X POST http://localhost:8080/api/ExchangeRate \
   -H "Content-Type: application/json" \
   -d '{
     "baseCurrencyCode": "USD",
@@ -270,7 +270,7 @@ Creates a new exchange rate between two currencies.
 
 <CodeGroup>
 ```bash PATCH /api/ExchangeRate/{baseCurrencyCode}&{targetCurrencyCode}
-curl -X PATCH "http://localhost:5000/api/ExchangeRate/USD&EUR" \
+curl -X PATCH "http://localhost:8080/api/ExchangeRate/USD&EUR" \
   -H "Content-Type: application/json" \
   -d '{
     "rate": 0.95
