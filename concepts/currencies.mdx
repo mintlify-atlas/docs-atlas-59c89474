@@ -1,0 +1,188 @@
+---
+title: 'Currencies'
+description: 'Understanding currency models, validation rules, and ISO standards in the Currency Exchange API'
+---
+
+## Overview
+
+Currencies are fundamental entities in the Currency Exchange API. Each currency is represented by the `Currency` model, which enforces strict validation rules to ensure data integrity and compliance with international standards.
+
+## Currency Model Structure
+
+The `Currency` class uses an immutable design pattern with a private constructor and a public factory method for creation.
+
+```csharp CurrencyExchange.Core/Models/Currency.cs
+public class Currency
+{
+    private Currency(int id, string code, string fullName, string sign)
+    {
+        Id = id;
+        Code = code;
+        FullName = fullName;
+        Sign = sign;
+    }
+
+    public int Id { get; }
+    public string Code { get; }
+    public string FullName { get; }
+    public string Sign { get; }
+}
+```
+
+### Properties
+
+<ResponseField name="Id" type="int" required>
+  Unique identifier for the currency
+</ResponseField>
+
+<ResponseField name="Code" type="string" required>
+  ISO 4217 currency code (e.g., "USD", "EUR", "RUB")
+</ResponseField>
+
+<ResponseField name="FullName" type="string" required>
+  Full name of the currency (e.g., "US Dollar", "Euro")
+</ResponseField>
+
+<ResponseField name="Sign" type="string" required>
+  Currency symbol (e.g., "$", "€", "₽")
+</ResponseField>
+
+## Creating Currencies
+
+Currencies are created using the static `Create` method, which performs all necessary validations:
+
+```csharp
+public static Currency Create(int id, string code, string fullName, string sign)
+{
+    code = code.ToUpperInvariant();
+
+    Validate(code, 3, 5, @"[^A-Z]");
+    Validate(fullName, 3, 60, @"[^A-Za-zА-Яа-яЁё() ]");
+    Validate(sign, 1, 3, @"[ \n]");
+
+    return new Currency(id, code, fullName, sign);
+}
+```
+
+<Note>
+  The currency code is automatically converted to uppercase before validation, ensuring consistency across the system.
+</Note>
+
+## Validation Rules
+
+The Currency model enforces strict validation rules using regular expressions and length constraints:
+
+<Accordion title="Currency Code Validation">
+  **Length:** 3-5 characters
+  
+  **Pattern:** Only uppercase letters (A-Z)
+  
+  **Regex:** `[^A-Z]` (rejects any non-uppercase letter)
+  
+  **Examples:**
+  - ✅ Valid: "USD", "EUR", "RUB", "GBP"
+  - ❌ Invalid: "us" (too short), "usd" (lowercase), "U$D" (special character)
+  
+  ```csharp
+  Validate(code, 3, 5, @"[^A-Z]");
+  ```
+</Accordion>
+
+<Accordion title="Full Name Validation">
+  **Length:** 3-60 characters
+  
+  **Pattern:** Letters (Latin and Cyrillic), parentheses, and spaces
+  
+  **Regex:** `[^A-Za-zА-Яа-яЁё() ]` (rejects anything except allowed characters)
+  
+  **Examples:**
+  - ✅ Valid: "US Dollar", "Euro", "Российский рубль"
+  - ❌ Invalid: "$" (too short), "Currency@123" (special characters)
+  
+  ```csharp
+  Validate(fullName, 3, 60, @"[^A-Za-zА-Яа-яЁё() ]");
+  ```
+</Accordion>
+
+<Accordion title="Currency Sign Validation">
+  **Length:** 1-3 characters
+  
+  **Pattern:** No spaces or newlines
+  
+  **Regex:** `[ \n]` (rejects spaces and newlines)
+  
+  **Examples:**
+  - ✅ Valid: "$", "€", "₽", "£"
+  - ❌ Invalid: "" (empty), "$ " (contains space)
+  
+  ```csharp
+  Validate(sign, 1, 3, @"[ \n]");
+  ```
+</Accordion>
+
+## Validation Implementation
+
+The validation logic is centralized in a static method that checks for null/empty values, length constraints, and pattern matching:
+
+```csharp CurrencyExchange.Core/Models/Currency.cs
+public static void Validate(string validateString, int minLength, int maxLength, string pattern)
+{
+    if (string.IsNullOrEmpty(validateString))
+        throw new ArgumentException("Не заполнен один или несколько параметров\n");
+    else if (validateString.Length < minLength || validateString.Length > maxLength)
+        throw new ArgumentException(
+            $"Не корректное количество символов указано для поля {validateString} валюты. Длина строки может быть от {minLength}-х до {maxLength} символов.\n");
+    else if (Regex.IsMatch(validateString, pattern, RegexOptions.Compiled))
+        throw new ArgumentException($"Не корректные символы в строке {validateString}.\n");
+}
+```
+
+<Tip>
+  The validation method uses `RegexOptions.Compiled` for improved performance when validating multiple currencies.
+</Tip>
+
+## ISO 4217 Currency Codes
+
+The Currency Exchange API follows ISO 4217 standards for currency codes. Common examples include:
+
+| Code | Currency | Symbol |
+|------|----------|--------|
+| USD  | US Dollar | $ |
+| EUR  | Euro | € |
+| RUB  | Russian Ruble | ₽ |
+| GBP  | British Pound | £ |
+| JPY  | Japanese Yen | ¥ |
+| CNY  | Chinese Yuan | ¥ |
+
+<Note>
+  While ISO 4217 standard codes are typically 3 characters, the API allows up to 5 characters to accommodate custom or future currency codes.
+</Note>
+
+## Error Handling
+
+When validation fails, the `Create` method throws an `ArgumentException` with descriptive error messages:
+
+```csharp
+try
+{
+    var currency = Currency.Create(1, "us", "US Dollar", "$");
+}
+catch (ArgumentException ex)
+{
+    // Error: "Не корректное количество символов указано для поля us валюты..."
+}
+```
+
+## Best Practices
+
+<Card title="Always Use the Create Method" icon="check">
+  Never attempt to instantiate `Currency` directly. Always use the static `Create` method to ensure all validation rules are applied.
+</Card>
+
+<Card title="Handle Validation Errors" icon="exclamation-triangle">
+  Wrap currency creation in try-catch blocks to handle validation errors gracefully and provide user-friendly error messages.
+</Card>
+
+<Card title="Use Standard ISO Codes" icon="globe">
+  Stick to official ISO 4217 currency codes whenever possible to ensure compatibility with external systems and services.
+</Card>

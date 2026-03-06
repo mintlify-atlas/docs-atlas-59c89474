@@ -1,0 +1,225 @@
+---
+title: 'Currency Exchange'
+description: 'Convert amounts between currencies using current exchange rates'
+---
+
+## Convert Currency
+
+<CodeGroup>
+```bash GET /api/Exchange/from={baseCurrencyCode}&to={targetCurrencyCode}&amount={amount}
+curl "http://localhost:5000/api/Exchange/from=USD&to=EUR&amount=100"
+```
+</CodeGroup>
+
+Converts an amount from one currency to another using the current exchange rate.
+
+### Path Parameters
+
+<ParamField path="baseCurrencyCode" type="string" required>
+  Currency code to convert from (e.g., "USD")
+</ParamField>
+
+<ParamField path="targetCurrencyCode" type="string" required>
+  Currency code to convert to (e.g., "EUR")
+</ParamField>
+
+<ParamField path="amount" type="float" required>
+  Amount to convert (must be a positive number)
+</ParamField>
+
+### Exchange Rate Resolution
+
+The API uses an intelligent exchange rate resolution system with three strategies:
+
+1. **Direct Rate**: First attempts to find a direct exchange rate from base to target currency
+2. **Reverse Rate**: If no direct rate exists, calculates using the reverse rate (1 / rate) from target to base
+3. **Cross Rate**: If neither direct nor reverse rate exists, calculates using cross rates through intermediate currencies (e.g., USD→RUB→EUR)
+
+### Response
+
+<ResponseField name="exchange" type="object">
+  Currency conversion result
+  
+  <ResponseField name="baseCurrency" type="object">
+    Source currency information
+    
+    <ResponseField name="id" type="integer">
+      Currency ID
+    </ResponseField>
+    
+    <ResponseField name="code" type="string">
+      Currency code
+    </ResponseField>
+    
+    <ResponseField name="fullName" type="string">
+      Full currency name
+    </ResponseField>
+    
+    <ResponseField name="sign" type="string">
+      Currency symbol
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="targetCurrency" type="object">
+    Target currency information (same structure as baseCurrency)
+  </ResponseField>
+  
+  <ResponseField name="rate" type="float">
+    Exchange rate used for conversion
+  </ResponseField>
+  
+  <ResponseField name="amount" type="float">
+    Original amount in base currency
+  </ResponseField>
+  
+  <ResponseField name="convertedAmount" type="float">
+    Converted amount in target currency
+  </ResponseField>
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "baseCurrency": {
+    "id": 1,
+    "code": "USD",
+    "fullName": "United States Dollar",
+    "sign": "$"
+  },
+  "targetCurrency": {
+    "id": 2,
+    "code": "EUR",
+    "fullName": "Euro",
+    "sign": "€"
+  },
+  "rate": 0.92,
+  "amount": 100.0,
+  "convertedAmount": 92.0
+}
+```
+
+### Example Usage
+
+**Convert USD to EUR:**
+```bash
+curl "http://localhost:5000/api/Exchange/from=USD&to=EUR&amount=100"
+```
+
+**Convert EUR to GBP:**
+```bash
+curl "http://localhost:5000/api/Exchange/from=EUR&to=GBP&amount=50"
+```
+
+**Convert with decimal amount:**
+```bash
+curl "http://localhost:5000/api/Exchange/from=USD&to=JPY&amount=99.99"
+```
+
+### Conversion Logic
+
+The conversion follows this formula:
+
+```
+convertedAmount = amount × rate
+```
+
+For example:
+- Converting 100 USD to EUR with rate 0.92:
+  - `100 × 0.92 = 92.0 EUR`
+
+### Error Responses
+
+**Currency not found:**
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "message": ["Не удалось найти валюту"]
+  }
+}
+```
+
+**No exchange rate available:**
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.4",
+  "title": "An error occurred while processing the request.",
+  "status": 500,
+  "errors": {
+    "message": ["Не удалось найти или создать подходящий обменный курс"]
+  }
+}
+```
+
+**Invalid amount format:**
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "amount": ["The value 'invalid' is not valid for amount."]
+  }
+}
+```
+
+## Multi-Currency Conversion Examples
+
+### Simple Direct Conversion
+
+When a direct exchange rate exists between two currencies:
+
+```bash
+curl "http://localhost:5000/api/Exchange/from=USD&to=EUR&amount=250"
+```
+
+Response:
+```json
+{
+  "baseCurrency": {
+    "id": 1,
+    "code": "USD",
+    "fullName": "United States Dollar",
+    "sign": "$"
+  },
+  "targetCurrency": {
+    "id": 2,
+    "code": "EUR",
+    "fullName": "Euro",
+    "sign": "€"
+  },
+  "rate": 0.92,
+  "amount": 250.0,
+  "convertedAmount": 230.0
+}
+```
+
+### Reverse Rate Conversion
+
+When only the reverse rate exists (e.g., EUR→USD exists, but you need USD→EUR):
+
+```bash
+curl "http://localhost:5000/api/Exchange/from=EUR&to=USD&amount=100"
+```
+
+The system automatically calculates the reverse rate.
+
+### Cross Rate Conversion
+
+When no direct or reverse rate exists, the system uses intermediate currencies:
+
+```bash
+curl "http://localhost:5000/api/Exchange/from=GBP&to=JPY&amount=50"
+```
+
+The system might convert GBP→USD→JPY automatically.
+
+## Notes
+
+- All amounts are returned as floating-point numbers
+- Exchange rates may be automatically created and saved when using reverse or cross rate strategies
+- The API ensures currency codes exist before performing conversions
+- Validation errors include descriptive messages (some in Russian)

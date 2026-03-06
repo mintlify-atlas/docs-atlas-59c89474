@@ -1,0 +1,135 @@
+---
+title: Introduction
+description: A modern .NET 8 REST API for currency exchange with automatic rate updates from the Central Bank of Russia
+---
+
+## What is Currency Exchange API?
+
+The Currency Exchange API is a production-ready REST API built with .NET 8 that provides real-time currency conversion and exchange rate management. It automatically synchronizes exchange rates from the Central Bank of Russia (CBR) and supports intelligent rate calculations through direct, reverse, and cross-rate conversions.
+
+## Key Features
+
+### Automatic Rate Updates
+The API includes a background hosted service (`CBRExchangeRate`) that periodically fetches and updates exchange rates from the Central Bank of Russia's SOAP service. The update interval is configurable via `appsettings.json`.
+
+### Intelligent Rate Calculation
+When converting between currency pairs, the API intelligently:
+- Uses direct rates when available
+- Calculates and saves reverse rates automatically (e.g., if USD→RUB exists, it can calculate RUB→USD)
+- Computes cross-rates through intermediate currencies when direct pairs don't exist
+
+### Clean Architecture
+The project follows clean architecture principles with clear separation of concerns:
+- **API Layer** - Controllers and HTTP concerns
+- **Application Layer** - Business logic and services
+- **Core Layer** - Domain models and interfaces
+- **Data Layer** - Database access and external services
+
+### Enterprise Features
+- PostgreSQL database with Entity Framework Core
+- Input validation and error handling middleware
+- Swagger/OpenAPI documentation
+- CORS configuration
+- Docker support for easy deployment
+
+## Technology Stack
+
+<CardGroup cols={2}>
+  <Card title=".NET 8" icon="code">
+    Latest LTS version of .NET for high-performance APIs
+  </Card>
+  <Card title="PostgreSQL" icon="database">
+    Reliable relational database with EF Core ORM
+  </Card>
+  <Card title="Entity Framework Core" icon="table">
+    Modern ORM with LINQ support and migrations
+  </Card>
+  <Card title="Swagger/OpenAPI" icon="book">
+    Interactive API documentation and testing
+  </Card>
+</CardGroup>
+
+### Additional Technologies
+- **WCF SOAP Client** - Integration with Central Bank of Russia service
+- **Docker & Docker Compose** - Containerized deployment
+- **Nginx** - Reverse proxy configuration (optional)
+
+## Use Cases
+
+### Financial Applications
+- Currency conversion for e-commerce platforms
+- Multi-currency pricing systems
+- Financial reporting with automatic rate updates
+
+### Travel & Tourism
+- Real-time currency conversion for booking systems
+- Travel expense calculators
+- Multi-currency payment processing
+
+### Data Analytics
+- Historical exchange rate analysis
+- Currency trend monitoring
+- Financial market data aggregation
+
+## Core Capabilities
+
+<Steps>
+  <Step title="Currency Management">
+    Create, retrieve, and search currencies with validation for codes, names, and symbols.
+    
+    See `CurrencyController` in `CurrencyExchange/Controllers/CurrencyController.cs:10`
+  </Step>
+  
+  <Step title="Exchange Rate Management">
+    Manage exchange rates between currency pairs with automatic validation and duplicate prevention.
+    
+    Implemented in `ExchangeRateController` at `CurrencyExchange/Controllers/ExchangeRateController.cs:10`
+  </Step>
+  
+  <Step title="Currency Conversion">
+    Convert amounts between any currency pair with automatic cross-rate calculation.
+    
+    Available via `ExchangeController` in `CurrencyExchange/Controllers/ExchangeController.cs:10`
+  </Step>
+  
+  <Step title="Automatic Rate Updates">
+    Background service updates rates from CBR on a configurable schedule.
+    
+    Implemented in `CBRExchangeRate` at `CurrencyExchange.Data/ExternalServices/Clients/CBRExchangeRate.cs:13`
+  </Step>
+</Steps>
+
+<Note>
+  The API includes comprehensive input validation using regular expressions and range checks. All currency codes are automatically converted to uppercase, and rates must be between 0 and 99,999,999.
+</Note>
+
+## Project Structure
+
+```
+CurrencyExchange/
+├── CurrencyExchange/              # API Layer
+│   ├── Controllers/               # REST API endpoints
+│   ├── Contracts/                 # DTOs and request/response models
+│   └── Extensions/                # Middleware (exception handling)
+├── CurrencyExchange.Application/  # Application Layer
+│   └── Application/               # Business logic services
+├── CurrencyExchange.Core/         # Core Layer
+│   ├── Abstractions/              # Interfaces
+│   └── Models/                    # Domain models
+└── CurrencyExchange.Data/         # Data Layer
+    ├── Configurations/            # EF Core configurations
+    ├── Entities/                  # Database entities
+    ├── ExternalServices/          # External API clients
+    └── Repositories/              # Data access implementations
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get the API running locally with Docker in minutes
+  </Card>
+  <Card title="Architecture" icon="diagram-project" href="/architecture">
+    Learn about the clean architecture design and components
+  </Card>
+</CardGroup>

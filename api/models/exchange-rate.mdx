@@ -1,0 +1,253 @@
+---
+title: "Exchange Rate"
+description: "Exchange rate model and data transfer objects"
+---
+
+## ExchangeRate Model
+
+The `ExchangeRate` class represents the conversion rate between two currencies.
+
+### Class Structure
+
+```csharp
+public class ExchangeRate
+{
+    public const int MIN_RATE = 0;
+    public const int MAX_RATE = 99999999;
+    
+    public int Id { get; }
+    public Currency BaseCurrency { get; }
+    public Currency TargetCurrency { get; }
+    public float Rate { get; }
+}
+```
+
+### Properties
+
+<ResponseField name="Id" type="integer" required>
+  Unique identifier for the exchange rate
+</ResponseField>
+
+<ResponseField name="BaseCurrency" type="Currency" required>
+  The source currency for the exchange rate. See [Currency](/api/models/currency) for details.
+</ResponseField>
+
+<ResponseField name="TargetCurrency" type="Currency" required>
+  The destination currency for the exchange rate. See [Currency](/api/models/currency) for details.
+</ResponseField>
+
+<ResponseField name="Rate" type="float" required>
+  The exchange rate from base currency to target currency
+  
+  **Constraints:**
+  - Must be greater than `0` (MIN_RATE)
+  - Must not exceed `99999999` (MAX_RATE)
+  - Represents how many units of target currency equal 1 unit of base currency
+</ResponseField>
+
+<Note>
+  **Rate Constraints:** The rate must be in the range (0, 99999999]. A rate of 0 or below is not allowed, and rates exceeding 99,999,999 will be rejected.
+</Note>
+
+## ExchangeRateDTO
+
+Data transfer object used for API responses containing full exchange rate information.
+
+### TypeScript Definition
+
+```typescript
+interface ExchangeRateDTO {
+  Id: number;
+  BaseCurrency: Currency;
+  TargetCurrency: Currency;
+  Rate: number;
+}
+```
+
+### Properties
+
+<ResponseField name="Id" type="integer" required>
+  Unique identifier for the exchange rate
+</ResponseField>
+
+<ResponseField name="BaseCurrency" type="Currency" required>
+  Complete currency object for the base currency
+</ResponseField>
+
+<ResponseField name="TargetCurrency" type="Currency" required>
+  Complete currency object for the target currency
+</ResponseField>
+
+<ResponseField name="Rate" type="float" required>
+  Exchange rate value (0 < rate ≤ 99999999)
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "Id": 1,
+  "BaseCurrency": {
+    "ID": 1,
+    "Code": "USD",
+    "FullName": "US Dollar",
+    "Sign": "$"
+  },
+  "TargetCurrency": {
+    "ID": 2,
+    "Code": "EUR",
+    "FullName": "Euro",
+    "Sign": "€"
+  },
+  "Rate": 0.85
+}
+```
+
+## AddExchangeRateDTO
+
+Data transfer object used when creating a new exchange rate.
+
+### TypeScript Definition
+
+```typescript
+interface AddExchangeRateDTO {
+  BaseCurrencyCode: string;
+  TargetCurrencyCode: string;
+  Rate: number;
+}
+```
+
+### Properties
+
+<ResponseField name="BaseCurrencyCode" type="string" required>
+  Currency code for the base currency (e.g., "USD")
+  
+  Must be a valid currency code that exists in the system (3-5 uppercase letters)
+</ResponseField>
+
+<ResponseField name="TargetCurrencyCode" type="string" required>
+  Currency code for the target currency (e.g., "EUR")
+  
+  Must be a valid currency code that exists in the system (3-5 uppercase letters)
+</ResponseField>
+
+<ResponseField name="Rate" type="float" required>
+  Exchange rate value
+  
+  **Constraints:**
+  - Must be greater than 0
+  - Must not exceed 99999999
+</ResponseField>
+
+### Example Request
+
+```json
+{
+  "BaseCurrencyCode": "USD",
+  "TargetCurrencyCode": "EUR",
+  "Rate": 0.85
+}
+```
+
+## UpdateRateDTO
+
+Data transfer object used when updating an existing exchange rate.
+
+### TypeScript Definition
+
+```typescript
+interface UpdateRateDTO {
+  Rate: number;
+}
+```
+
+### Properties
+
+<ResponseField name="Rate" type="float" required>
+  New exchange rate value
+  
+  **Constraints:**
+  - Must be greater than 0 (MIN_RATE)
+  - Must not exceed 99999999 (MAX_RATE)
+</ResponseField>
+
+### Example Request
+
+```json
+{
+  "Rate": 0.87
+}
+```
+
+<Note>
+  When updating an exchange rate, only the rate value can be modified. To change the currency pair, you must create a new exchange rate record.
+</Note>
+
+## Rate Constraints Summary
+
+| Constraint | Value | Description |
+|-----------|-------|-------------|
+| MIN_RATE | 0 | Rate must be **greater than** 0 (exclusive) |
+| MAX_RATE | 99999999 | Rate must be **less than or equal to** 99,999,999 |
+
+## Additional Examples
+
+### USD to GBP Exchange Rate
+
+```json
+{
+  "Id": 2,
+  "BaseCurrency": {
+    "ID": 1,
+    "Code": "USD",
+    "FullName": "US Dollar",
+    "Sign": "$"
+  },
+  "TargetCurrency": {
+    "ID": 3,
+    "Code": "GBP",
+    "FullName": "British Pound",
+    "Sign": "£"
+  },
+  "Rate": 0.73
+}
+```
+
+### EUR to RUB Exchange Rate
+
+```json
+{
+  "Id": 3,
+  "BaseCurrency": {
+    "ID": 2,
+    "Code": "EUR",
+    "FullName": "Euro",
+    "Sign": "€"
+  },
+  "TargetCurrency": {
+    "ID": 4,
+    "Code": "RUB",
+    "FullName": "Российский рубль",
+    "Sign": "₽"
+  },
+  "Rate": 105.50
+}
+```
+
+### Creating a New Exchange Rate
+
+```json
+{
+  "BaseCurrencyCode": "GBP",
+  "TargetCurrencyCode": "JPY",
+  "Rate": 185.25
+}
+```
+
+### Updating an Exchange Rate
+
+```json
+{
+  "Rate": 186.50
+}
+```

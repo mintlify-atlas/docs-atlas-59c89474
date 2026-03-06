@@ -1,0 +1,516 @@
+---
+title: 'Database Setup'
+description: 'Set up and configure the PostgreSQL database for the Currency Exchange API'
+---
+
+The Currency Exchange API uses PostgreSQL 17 as its database engine, storing currency information and exchange rates.
+
+## Database Overview
+
+The application uses two main tables:
+
+- **currencies** - Stores currency information (code, name, symbol)
+- **exchangerates** - Stores exchange rate pairs between currencies
+
+## PostgreSQL Setup
+
+### Using Docker Compose
+
+The recommended way to run PostgreSQL is using Docker Compose:
+
+```yaml
+services:
+  postgres:
+    image: postgres:17
+    container_name: currencies-bd
+    environment:
+      POSTGRES_DB: "currencies"
+      POSTGRES_USER: "alexpg"
+      POSTGRES_PASSWORD: ${password}
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ../2. Init Database:/docker-entrypoint-initdb.d
+      - currencies:/var/lib/postgresql/data
+
+volumes:
+  currencies:
+```
+
+<Steps>
+  <Step title="Start the PostgreSQL container">
+    ```bash
+    docker-compose up -d postgres
+    ```
+  </Step>
+
+  <Step title="Verify the database is running">
+    ```bash
+    docker ps | grep currencies-bd
+    ```
+  </Step>
+
+  <Step title="Check the logs">
+    ```bash
+    docker logs currencies-bd
+    ```
+    
+    You should see messages indicating the database is ready to accept connections.
+  </Step>
+</Steps>
+
+### Manual PostgreSQL Installation
+
+If you prefer to install PostgreSQL manually:
+
+<CodeGroup>
+```bash Ubuntu/Debian
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+```
+
+```bash macOS (Homebrew)
+brew install postgresql@17
+brew services start postgresql@17
+```
+
+```bash Windows
+# Download and run the installer from:
+# https://www.postgresql.org/download/windows/
+```
+</CodeGroup>
+
+## Database Schema
+
+The database schema consists of two tables with relationships and indexes.
+
+### Tables
+
+#### currencies Table
+
+Stores information about different currencies:
+
+```sql
+CREATE TABLE currencies (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(400),
+    fullname VARCHAR(400),
+    sign VARCHAR(400)
+);
+```
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | SERIAL | Primary key (auto-increment) |
+| `code` | VARCHAR(400) | Currency code (e.g., USD, EUR, RUB) |
+| `fullname` | VARCHAR(400) | Full currency name (e.g., US Dollar) |
+| `sign` | VARCHAR(400) | Currency symbol (e.g., $, €, ₽) |
+
+#### exchangerates Table
+
+Stores exchange rates between currency pairs:
+
+```sql
+CREATE TABLE exchangerates (
+    id SERIAL PRIMARY KEY,
+    basecurrencyid INT REFERENCES currencies(id),
+    targetcurrencyid INT REFERENCES currencies(id),
+    rate REAL
+);
+```
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | SERIAL | Primary key (auto-increment) |
+| `basecurrencyid` | INT | Foreign key to currencies table (base currency) |
+| `targetcurrencyid` | INT | Foreign key to currencies table (target currency) |
+| `rate` | REAL | Exchange rate from base to target currency |
+
+### Indexes
+
+Unique indexes ensure data integrity:
+
+```sql
+-- Ensure currency codes are unique
+CREATE UNIQUE INDEX ix_code ON currencies (code);
+
+-- Ensure each currency pair is unique
+CREATE UNIQUE INDEX ix_currencyids ON exchangerates (basecurrencyid, targetcurrencyid);
+```
+
+<Note>
+The unique index on `exchangerates` prevents duplicate exchange rates for the same currency pair.
+</Note>
+
+## Database Initialization
+
+The database is automatically initialized using SQL scripts mounted in the Docker container.
+
+### Initial Schema Setup
+
+<Steps>
+  <Step title="Create the tables">
+    ```sql
+    CREATE TABLE currencies (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(400),
+        fullname VARCHAR(400),
+        sign VARCHAR(400)
+    );
+
+    CREATE TABLE exchangerates (
+        id SERIAL PRIMARY KEY,
+        basecurrencyid INT REFERENCES currencies(id),
+        targetcurrencyid INT REFERENCES currencies(id),
+        rate REAL
+    );
+    ```
+  </Step>
+
+  <Step title="Add indexes">
+    ```sql
+    CREATE UNIQUE INDEX ix_code ON currencies (code);
+    CREATE UNIQUE INDEX ix_currencyids ON exchangerates (basecurrencyid, targetcurrencyid);
+    ```
+  </Step>
+
+  <Step title="Insert initial data">
+    ```sql
+    INSERT INTO currencies (code, fullname, sign)
+    VALUES 
+        ('USD', 'US Dollar', '$'),
+        ('RUB', 'Russian Ruble', '₽');
+
+    INSERT INTO exchangerates (basecurrencyid, targetcurrencyid, rate)
+    VALUES 
+        (1, 2, 0.012),
+        (2, 1, 82.25);
+    ```
+  </Step>
+</Steps>
+
+### Complete Initialization Script
+
+Here's the complete SQL script from `data.sql`:
+
+```sql
+-- Create tables
+CREATE TABLE currencies (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(400),
+    fullname VARCHAR(400),
+    sign VARCHAR(400)
+);
+
+CREATE TABLE exchangerates (
+    id SERIAL PRIMARY KEY,
+    basecurrencyid INT REFERENCES currencies(id),
+    targetcurrencyid INT REFERENCES currencies(id),
+    rate REAL
+);
+
+-- Insert test data
+INSERT INTO currencies (code, fullname, sign)
+VALUES 
+    ('USD', 'US Dollar', '$'),
+    ('RUB', 'Russian Ruble', '₽');
+
+INSERT INTO exchangerates (basecurrencyid, targetcurrencyid, rate)
+VALUES 
+    (1, 2, 0.012),
+    (2, 1, 82.25);
+
+-- Add unique indexes
+CREATE UNIQUE INDEX ix_code ON currencies (code);
+CREATE UNIQUE INDEX ix_currencyids ON exchangerates (basecurrencyid, targetcurrencyid);
+```
+
+## Running Migrations
+
+The Currency Exchange API uses Entity Framework Core for database access. The application automatically applies migrations at startup.
+
+### Automatic Migration
+
+The DbContext is configured in `Program.cs` (lines 20-23):
+
+```csharp
+builder.Services.AddDbContext<CurrencyExchangeDBContext>(options =>
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString(nameof(CurrencyExchangeDBContext)));
+});
+```
+
+<Note>
+The connection string is read from `appsettings.json` and must match your PostgreSQL configuration.
+</Note>
+
+### Manual Migration Commands
+
+If you need to manage migrations manually:
+
+<CodeGroup>
+```bash Create Migration
+dotnet ef migrations add InitialCreate --project CurrencyExchange.Data
+```
+
+```bash Apply Migrations
+dotnet ef database update --project CurrencyExchange
+```
+
+```bash Rollback Migration
+dotnet ef database update PreviousMigrationName --project CurrencyExchange
+```
+
+```bash List Migrations
+dotnet ef migrations list --project CurrencyExchange.Data
+```
+</CodeGroup>
+
+## Database Connection
+
+### Connection String
+
+The connection string is configured in `appsettings.json`:
+
+```json
+"ConnectionStrings": {
+  "CurrencyExchangeDBContext": "Host=postgres;Database=currencies;Port=5432;User ID=alexpg;Password=76t34qVBh3;CommandTimeout=1200;"
+}
+```
+
+**Parameters**:
+- `Host=postgres` - Database host (Docker service name or hostname)
+- `Database=currencies` - Database name
+- `Port=5432` - PostgreSQL port
+- `User ID=alexpg` - Database user
+- `Password=76t34qVBh3` - Database password
+- `CommandTimeout=1200` - Command timeout in seconds (20 minutes)
+
+<Warning>
+For production, use environment variables to store the connection string securely:
+```bash
+export ConnectionStrings__CurrencyExchangeDBContext="Host=prod-db;Database=currencies;Port=5432;User ID=admin;Password=secure_password;CommandTimeout=1200;"
+```
+</Warning>
+
+### Testing the Connection
+
+Verify the database connection using `psql`:
+
+```bash
+# Connect to the database
+docker exec -it currencies-bd psql -U alexpg -d currencies
+
+# List tables
+\dt
+
+# Query currencies
+SELECT * FROM currencies;
+
+# Query exchange rates
+SELECT 
+    c1.code AS base_currency,
+    c2.code AS target_currency,
+    e.rate
+FROM exchangerates e
+JOIN currencies c1 ON e.basecurrencyid = c1.id
+JOIN currencies c2 ON e.targetcurrencyid = c2.id;
+
+# Exit
+\q
+```
+
+## Data Management
+
+### Backup Database
+
+<CodeGroup>
+```bash Using Docker
+docker exec currencies-bd pg_dump -U alexpg currencies > backup.sql
+```
+
+```bash Direct PostgreSQL
+pg_dump -h localhost -p 5432 -U alexpg -d currencies -f backup.sql
+```
+</CodeGroup>
+
+### Restore Database
+
+<CodeGroup>
+```bash Using Docker
+docker exec -i currencies-bd psql -U alexpg -d currencies < backup.sql
+```
+
+```bash Direct PostgreSQL
+psql -h localhost -p 5432 -U alexpg -d currencies -f backup.sql
+```
+</CodeGroup>
+
+### Reset Database
+
+To completely reset the database:
+
+<Steps>
+  <Step title="Stop the application">
+    ```bash
+    docker stop currencies-backend
+    ```
+  </Step>
+
+  <Step title="Drop and recreate the database">
+    ```bash
+    docker exec -it currencies-bd psql -U alexpg -c "DROP DATABASE IF EXISTS currencies;"
+    docker exec -it currencies-bd psql -U alexpg -c "CREATE DATABASE currencies;"
+    ```
+  </Step>
+
+  <Step title="Restart the database container">
+    ```bash
+    docker-compose restart postgres
+    ```
+    
+    The initialization scripts will run automatically.
+  </Step>
+
+  <Step title="Start the application">
+    ```bash
+    docker start currencies-backend
+    ```
+  </Step>
+</Steps>
+
+## Performance Optimization
+
+### Index Optimization
+
+The database uses indexes to improve query performance:
+
+```sql
+-- Currency code lookups
+CREATE UNIQUE INDEX ix_code ON currencies (code);
+
+-- Exchange rate lookups by currency pair
+CREATE UNIQUE INDEX ix_currencyids ON exchangerates (basecurrencyid, targetcurrencyid);
+```
+
+Consider adding additional indexes for frequent queries:
+
+```sql
+-- Optimize queries by target currency
+CREATE INDEX ix_targetcurrency ON exchangerates (targetcurrencyid);
+
+-- Optimize queries by currency name
+CREATE INDEX ix_fullname ON currencies (fullname);
+```
+
+### Connection Pooling
+
+Entity Framework Core automatically manages connection pooling. The `CommandTimeout=1200` setting in the connection string ensures long-running queries don't timeout prematurely.
+
+## Monitoring and Maintenance
+
+### Check Database Size
+
+```sql
+SELECT 
+    pg_size_pretty(pg_database_size('currencies')) AS database_size;
+```
+
+### View Active Connections
+
+```sql
+SELECT 
+    count(*) AS connection_count,
+    state
+FROM pg_stat_activity
+WHERE datname = 'currencies'
+GROUP BY state;
+```
+
+### Monitor Query Performance
+
+```sql
+-- Enable query statistics
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+-- View slow queries
+SELECT 
+    query,
+    calls,
+    total_time,
+    mean_time
+FROM pg_stat_statements
+ORDER BY mean_time DESC
+LIMIT 10;
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Connection refused">
+    Check if PostgreSQL is running:
+    ```bash
+    docker ps | grep currencies-bd
+    docker logs currencies-bd
+    ```
+    
+    Verify the connection string matches your configuration.
+  </Accordion>
+
+  <Accordion title="Authentication failed">
+    Ensure the username and password in `appsettings.json` match the database configuration:
+    ```json
+    "ConnectionStrings": {
+      "CurrencyExchangeDBContext": "Host=postgres;Database=currencies;Port=5432;User ID=alexpg;Password=YOUR_PASSWORD;CommandTimeout=1200;"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Table does not exist">
+    The database may not be initialized. Check if initialization scripts ran:
+    ```bash
+    docker logs currencies-bd | grep "CREATE TABLE"
+    ```
+    
+    Manually run the initialization script if needed:
+    ```bash
+    docker exec -i currencies-bd psql -U alexpg -d currencies < data.sql
+    ```
+  </Accordion>
+
+  <Accordion title="Duplicate key violation">
+    This occurs when trying to insert duplicate currency codes or exchange rate pairs. The unique indexes prevent duplicates:
+    
+    - Check existing data before inserting
+    - Use `ON CONFLICT` clause for upserts:
+    
+    ```sql
+    INSERT INTO currencies (code, fullname, sign)
+    VALUES ('USD', 'US Dollar', '$')
+    ON CONFLICT (code) DO NOTHING;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Strong Passwords" icon="lock">
+    Use strong, unique passwords for database users. Never use default passwords in production.
+  </Card>
+  
+  <Card title="Limited Privileges" icon="user-shield">
+    Create application-specific database users with minimal required privileges.
+  </Card>
+  
+  <Card title="Encrypted Connections" icon="shield-halved">
+    Enable SSL/TLS for database connections in production environments.
+  </Card>
+  
+  <Card title="Regular Backups" icon="floppy-disk">
+    Schedule automated backups and test restore procedures regularly.
+  </Card>
+</CardGroup>

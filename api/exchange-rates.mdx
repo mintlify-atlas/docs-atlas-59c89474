@@ -1,0 +1,374 @@
+---
+title: 'Exchange Rates'
+description: 'Manage exchange rates between currency pairs'
+---
+
+## Get All Exchange Rates
+
+<CodeGroup>
+```bash GET /api/ExchangeRate
+curl http://localhost:5000/api/ExchangeRate
+```
+</CodeGroup>
+
+Retrieves all exchange rates configured in the system.
+
+### Response
+
+<ResponseField name="exchangeRates" type="array">
+  Array of exchange rate objects
+  
+  <ResponseField name="id" type="integer">
+    Unique identifier for the exchange rate
+  </ResponseField>
+  
+  <ResponseField name="baseCurrency" type="object">
+    The base currency object
+    
+    <ResponseField name="id" type="integer">
+      Currency ID
+    </ResponseField>
+    
+    <ResponseField name="code" type="string">
+      Currency code
+    </ResponseField>
+    
+    <ResponseField name="fullName" type="string">
+      Full currency name
+    </ResponseField>
+    
+    <ResponseField name="sign" type="string">
+      Currency symbol
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="targetCurrency" type="object">
+    The target currency object (same structure as baseCurrency)
+  </ResponseField>
+  
+  <ResponseField name="rate" type="float">
+    Exchange rate from base to target currency
+  </ResponseField>
+</ResponseField>
+
+### Example Response
+
+```json
+[
+  {
+    "id": 1,
+    "baseCurrency": {
+      "id": 1,
+      "code": "USD",
+      "fullName": "United States Dollar",
+      "sign": "$"
+    },
+    "targetCurrency": {
+      "id": 2,
+      "code": "EUR",
+      "fullName": "Euro",
+      "sign": "€"
+    },
+    "rate": 0.92
+  },
+  {
+    "id": 2,
+    "baseCurrency": {
+      "id": 1,
+      "code": "USD",
+      "fullName": "United States Dollar",
+      "sign": "$"
+    },
+    "targetCurrency": {
+      "id": 3,
+      "code": "GBP",
+      "fullName": "British Pound Sterling",
+      "sign": "£"
+    },
+    "rate": 0.79
+  }
+]
+```
+
+---
+
+## Find Exchange Rate
+
+<CodeGroup>
+```bash GET /api/ExchangeRate/{searchString}
+curl http://localhost:5000/api/ExchangeRate/USD
+```
+</CodeGroup>
+
+Searches for exchange rates matching the provided search string. The search matches against currency codes in both base and target currencies.
+
+### Path Parameters
+
+<ParamField path="searchString" type="string" required>
+  Search term to find exchange rates (searches in currency codes)
+</ParamField>
+
+### Response
+
+<ResponseField name="exchangeRates" type="array">
+  Array of matching exchange rate objects
+  
+  <ResponseField name="id" type="integer">
+    Unique identifier
+  </ResponseField>
+  
+  <ResponseField name="baseCurrency" type="object">
+    Base currency object
+  </ResponseField>
+  
+  <ResponseField name="targetCurrency" type="object">
+    Target currency object
+  </ResponseField>
+  
+  <ResponseField name="rate" type="float">
+    Exchange rate value
+  </ResponseField>
+</ResponseField>
+
+### Example Response
+
+```json
+[
+  {
+    "id": 1,
+    "baseCurrency": {
+      "id": 1,
+      "code": "USD",
+      "fullName": "United States Dollar",
+      "sign": "$"
+    },
+    "targetCurrency": {
+      "id": 2,
+      "code": "EUR",
+      "fullName": "Euro",
+      "sign": "€"
+    },
+    "rate": 0.92
+  }
+]
+```
+
+---
+
+## Create Exchange Rate
+
+<CodeGroup>
+```bash POST /api/ExchangeRate
+curl -X POST http://localhost:5000/api/ExchangeRate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "baseCurrencyCode": "USD",
+    "targetCurrencyCode": "EUR",
+    "rate": 0.92
+  }'
+```
+</CodeGroup>
+
+Creates a new exchange rate between two currencies.
+
+### Request Body
+
+<ParamField body="baseCurrencyCode" type="string" required>
+  Currency code for the base currency (must exist in the system)
+</ParamField>
+
+<ParamField body="targetCurrencyCode" type="string" required>
+  Currency code for the target currency (must exist in the system)
+</ParamField>
+
+<ParamField body="rate" type="float" required>
+  Exchange rate from base to target currency (must be a valid positive number)
+</ParamField>
+
+### Example Request
+
+```json
+{
+  "baseCurrencyCode": "USD",
+  "targetCurrencyCode": "EUR",
+  "rate": 0.92
+}
+```
+
+### Response
+
+<ResponseField name="exchangeRate" type="object">
+  The created exchange rate object
+  
+  <ResponseField name="id" type="integer">
+    Generated unique identifier
+  </ResponseField>
+  
+  <ResponseField name="baseCurrency" type="object">
+    Full base currency object
+  </ResponseField>
+  
+  <ResponseField name="targetCurrency" type="object">
+    Full target currency object
+  </ResponseField>
+  
+  <ResponseField name="rate" type="float">
+    Exchange rate value
+  </ResponseField>
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "id": 3,
+  "baseCurrency": {
+    "id": 1,
+    "code": "USD",
+    "fullName": "United States Dollar",
+    "sign": "$"
+  },
+  "targetCurrency": {
+    "id": 2,
+    "code": "EUR",
+    "fullName": "Euro",
+    "sign": "€"
+  },
+  "rate": 0.92
+}
+```
+
+### Error Responses
+
+**Currency not found:**
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "message": ["Не удалось найти валюту"]
+  }
+}
+```
+
+**Invalid rate value:**
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "message": ["Rate validation error"]
+  }
+}
+```
+
+---
+
+## Update Exchange Rate
+
+<CodeGroup>
+```bash PATCH /api/ExchangeRate/{baseCurrencyCode}&{targetCurrencyCode}
+curl -X PATCH "http://localhost:5000/api/ExchangeRate/USD&EUR" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rate": 0.95
+  }'
+```
+</CodeGroup>
+
+Updates the exchange rate for an existing currency pair.
+
+### Path Parameters
+
+<ParamField path="baseCurrencyCode" type="string" required>
+  Currency code for the base currency
+</ParamField>
+
+<ParamField path="targetCurrencyCode" type="string" required>
+  Currency code for the target currency
+</ParamField>
+
+### Request Body
+
+<ParamField body="rate" type="float" required>
+  New exchange rate value (must be a valid positive number)
+</ParamField>
+
+### Example Request
+
+```json
+{
+  "rate": 0.95
+}
+```
+
+### Response
+
+<ResponseField name="exchangeRate" type="object">
+  The updated exchange rate object
+  
+  <ResponseField name="id" type="integer">
+    Exchange rate ID
+  </ResponseField>
+  
+  <ResponseField name="baseCurrency" type="object">
+    Base currency object
+  </ResponseField>
+  
+  <ResponseField name="targetCurrency" type="object">
+    Target currency object
+  </ResponseField>
+  
+  <ResponseField name="rate" type="float">
+    Updated exchange rate value
+  </ResponseField>
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "id": 1,
+  "baseCurrency": {
+    "id": 1,
+    "code": "USD",
+    "fullName": "United States Dollar",
+    "sign": "$"
+  },
+  "targetCurrency": {
+    "id": 2,
+    "code": "EUR",
+    "fullName": "Euro",
+    "sign": "€"
+  },
+  "rate": 0.95
+}
+```
+
+### Error Responses
+
+**Currency not found:**
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "message": ["Не удалось найти валюту"]
+  }
+}
+```
+
+**Invalid rate value:**
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "message": ["Rate validation error"]
+  }
+}
+```

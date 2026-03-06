@@ -1,0 +1,334 @@
+---
+title: 'Configuration'
+description: 'Configure the Currency Exchange API with environment variables and settings'
+---
+
+The Currency Exchange API uses `appsettings.json` for configuration management, following .NET's standard configuration patterns.
+
+## Configuration Files
+
+The application supports multiple configuration files for different environments:
+
+- `appsettings.json` - Base configuration for all environments
+- `appsettings.Development.json` - Development-specific overrides
+- `appsettings.Production.json` - Production-specific overrides (create as needed)
+
+## appsettings.json Structure
+
+Here's the complete structure of the main configuration file:
+
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+
+  "Kestrel": {
+    "Endpoints": {
+      "MyHttpEndpoint": {
+        "Url": "http://*:8080"
+      }
+    }
+  },
+  
+  "ConnectionStrings": {
+    "CurrencyExchangeDBContext": "Host=postgres;Database=currencies;Port=5432;User ID=alexpg;Password=76t34qVBh3;CommandTimeout=1200;"
+  },
+  
+  "CorsConfig": {
+    "Origin": [
+      "http://localhost:4200"
+    ]
+  },
+  
+  "ExternalUrls": {
+    "CBRUrl": "https://www.cbr-xml-daily.ru/daily_utf8.xml"
+  },
+  
+  "CurrencyReceiptPeriod": {
+    "Period": "300"
+  },
+  
+  "AllowedHosts": "*"
+}
+```
+
+## Configuration Sections
+
+### Logging
+
+Controls the logging behavior of the application:
+
+```json
+"Logging": {
+  "LogLevel": {
+    "Default": "Information",
+    "Microsoft.AspNetCore": "Warning"
+  }
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `Default` | `Information` | Default log level for all categories |
+| `Microsoft.AspNetCore` | `Warning` | Log level for ASP.NET Core framework logs |
+
+**Available Log Levels**: `Trace`, `Debug`, `Information`, `Warning`, `Error`, `Critical`, `None`
+
+### Kestrel Web Server
+
+Configures the HTTP endpoints for the Kestrel web server:
+
+```json
+"Kestrel": {
+  "Endpoints": {
+    "MyHttpEndpoint": {
+      "Url": "http://*:8080"
+    }
+  }
+}
+```
+
+<Note>
+The API listens on port 8080 by default. The `*` wildcard means it accepts connections on all network interfaces.
+</Note>
+
+### Connection Strings
+
+Defines database connection parameters:
+
+```json
+"ConnectionStrings": {
+  "CurrencyExchangeDBContext": "Host=postgres;Database=currencies;Port=5432;User ID=alexpg;Password=76t34qVBh3;CommandTimeout=1200;"
+}
+```
+
+**Connection String Parameters**:
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `Host` | `postgres` | Database server hostname (Docker service name) |
+| `Database` | `currencies` | Database name |
+| `Port` | `5432` | PostgreSQL port |
+| `User ID` | `alexpg` | Database user |
+| `Password` | `76t34qVBh3` | Database password |
+| `CommandTimeout` | `1200` | Command timeout in seconds (20 minutes) |
+
+<Warning>
+Never commit passwords directly in configuration files for production. Use environment variables or secure secret management instead.
+</Warning>
+
+### CORS Configuration
+
+Configures Cross-Origin Resource Sharing (CORS) policies:
+
+```json
+"CorsConfig": {
+  "Origin": [
+    "http://localhost:4200"
+  ]
+}
+```
+
+The CORS configuration is implemented in `Program.cs` (lines 52-58):
+
+```csharp
+app.UseCors(policy =>
+    {
+        policy.WithHeaders().AllowAnyHeader();
+        policy.WithOrigins(corsConfig);
+        policy.WithMethods().AllowAnyMethod();
+    }
+);
+```
+
+**Features**:
+- Allows any HTTP headers
+- Allows any HTTP methods (GET, POST, PUT, DELETE, etc.)
+- Restricts origins to those listed in the configuration
+
+<Note>
+Add your frontend URL to the `Origin` array to allow cross-origin requests from your client application.
+</Note>
+
+### External URLs
+
+Configures external API endpoints:
+
+```json
+"ExternalUrls": {
+  "CBRUrl": "https://www.cbr-xml-daily.ru/daily_utf8.xml"
+}
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `CBRUrl` | Central Bank of Russia (CBR) daily exchange rates XML feed |
+
+The application uses this URL to fetch current exchange rates from the Russian Central Bank.
+
+### Currency Receipt Period
+
+Controls how frequently the application fetches exchange rates:
+
+```json
+"CurrencyReceiptPeriod": {
+  "Period": "300"
+}
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `Period` | `300` | Time in seconds between exchange rate updates (5 minutes) |
+
+This is configured in `Program.cs` (lines 29-33):
+
+```csharp
+builder.Services.AddHostedService(provider =>
+{
+    var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
+    return new CBRExchangeRate(scopeFactory, currencyReceiptPeriod);
+});
+```
+
+### Allowed Hosts
+
+```json
+"AllowedHosts": "*"
+```
+
+Specifies which host headers are allowed. The wildcard `*` allows all hosts.
+
+<Warning>
+For production deployments, specify exact hostnames instead of using the wildcard:
+```json
+"AllowedHosts": "api.yourdomain.com;yourdomain.com"
+```
+</Warning>
+
+## Environment Variables
+
+You can override any configuration setting using environment variables with the following pattern:
+
+```bash
+# Format: Section__SubSection__Property
+export ConnectionStrings__CurrencyExchangeDBContext="Host=localhost;Database=currencies;Port=5432;User ID=admin;Password=secret;"
+export CorsConfig__Origin__0="http://localhost:3000"
+export ExternalUrls__CBRUrl="https://alternative-url.com/rates.xml"
+export CurrencyReceiptPeriod__Period="600"
+```
+
+<Steps>
+  <Step title="Create an environment file">
+    Create a `.env` file in your deployment directory:
+    
+    ```bash
+    # Database Configuration
+    DB_HOST=postgres
+    DB_NAME=currencies
+    DB_PORT=5432
+    DB_USER=alexpg
+    DB_PASSWORD=your_secure_password
+    
+    # CORS Origins (comma-separated)
+    CORS_ORIGINS=http://localhost:4200,https://yourdomain.com
+    
+    # External APIs
+    CBR_URL=https://www.cbr-xml-daily.ru/daily_utf8.xml
+    
+    # Update frequency (seconds)
+    RATE_UPDATE_PERIOD=300
+    ```
+  </Step>
+
+  <Step title="Load environment variables in Docker">
+    Update your `docker-compose.yaml` or Docker run command to use the environment file:
+    
+    ```yaml
+    services:
+      app:
+        image: currencyexchangeback
+        env_file:
+          - .env
+        environment:
+          ConnectionStrings__CurrencyExchangeDBContext: "Host=${DB_HOST};Database=${DB_NAME};Port=${DB_PORT};User ID=${DB_USER};Password=${DB_PASSWORD};CommandTimeout=1200;"
+          CorsConfig__Origin__0: "${CORS_ORIGINS}"
+          ExternalUrls__CBRUrl: "${CBR_URL}"
+          CurrencyReceiptPeriod__Period: "${RATE_UPDATE_PERIOD}"
+    ```
+  </Step>
+</Steps>
+
+## Production Configuration
+
+For production deployments, create an `appsettings.Production.json` file:
+
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Warning",
+      "Microsoft.AspNetCore": "Error"
+    }
+  },
+  
+  "ConnectionStrings": {
+    "CurrencyExchangeDBContext": "Host=${DB_HOST};Database=${DB_NAME};Port=${DB_PORT};User ID=${DB_USER};Password=${DB_PASSWORD};CommandTimeout=1200;"
+  },
+  
+  "CorsConfig": {
+    "Origin": [
+      "https://yourdomain.com",
+      "https://www.yourdomain.com"
+    ]
+  },
+  
+  "AllowedHosts": "api.yourdomain.com;yourdomain.com"
+}
+```
+
+<Note>
+The application automatically loads the correct configuration file based on the `ASPNETCORE_ENVIRONMENT` environment variable.
+</Note>
+
+## Configuration Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Environment Variables" icon="key">
+    Store sensitive information like passwords and API keys in environment variables, not in configuration files.
+  </Card>
+  
+  <Card title="Separate by Environment" icon="layer-group">
+    Maintain separate configuration files for development, staging, and production environments.
+  </Card>
+  
+  <Card title="Secure CORS Settings" icon="shield">
+    Only allow specific trusted origins in production. Never use wildcards.
+  </Card>
+  
+  <Card title="Monitor Logs" icon="file-lines">
+    Use appropriate log levels for each environment. More verbose in development, less in production.
+  </Card>
+</CardGroup>
+
+## Validation
+
+The application validates critical configuration settings at startup (see `Program.cs:12-13`):
+
+```csharp
+var corsConfig = builder.Configuration.GetSection("CorsConfig:Origin").Get<string[]>()
+                 ?? throw new ArgumentNullException(@"CorsConfig:Origin is required.");
+```
+
+If required configuration is missing, the application will fail to start with a clear error message.
+
+## Configuration Reference
+
+For more information about .NET configuration, see:
+
+- [ASP.NET Core Configuration](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/configuration/)
+- [Kestrel Web Server Configuration](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/kestrel/endpoints)
+- [Entity Framework Core Connection Strings](https://learn.microsoft.com/en-us/ef/core/miscellaneous/connection-strings)

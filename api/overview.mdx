@@ -1,0 +1,99 @@
+---
+title: 'API Overview'
+description: 'Currency Exchange API reference and getting started guide'
+---
+
+## Base URL
+
+All API endpoints are relative to your server's base URL:
+
+```
+http://localhost:5000/api
+```
+
+## Authentication
+
+This API does not currently require authentication. All endpoints are publicly accessible.
+
+## Response Format
+
+All API responses are returned in JSON format with appropriate HTTP status codes.
+
+### Success Response
+
+Successful requests return a `200 OK` status code with the requested data:
+
+```json
+{
+  "id": 1,
+  "code": "USD",
+  "fullName": "United States Dollar",
+  "sign": "$"
+}
+```
+
+### Error Response
+
+Errors return appropriate HTTP status codes with error details:
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "message": ["Не заполнен один или несколько параметров"]
+  }
+}
+```
+
+## Common Status Codes
+
+<ResponseField name="200" type="OK">
+  Request successful, data returned
+</ResponseField>
+
+<ResponseField name="400" type="Bad Request">
+  Invalid request parameters or validation error
+</ResponseField>
+
+<ResponseField name="404" type="Not Found">
+  Requested resource not found
+</ResponseField>
+
+<ResponseField name="500" type="Internal Server Error">
+  Server error occurred during request processing
+</ResponseField>
+
+## Error Handling
+
+The API validates all input data and returns detailed error messages. Common validation errors include:
+
+- **Empty or null values**: Required fields cannot be empty
+- **Invalid length**: String fields must meet minimum and maximum length requirements
+- **Invalid characters**: Fields must match allowed character patterns
+- **Invalid currency codes**: Currency codes must exist in the system
+
+### Validation Rules
+
+**Currency Fields:**
+- `Code`: 3-5 uppercase letters (A-Z)
+- `FullName`: 3-60 characters (letters, spaces, parentheses)
+- `Sign`: 1-3 characters (no whitespace or newlines)
+- `Rate`: Must be a valid float value
+
+**Search Strings:**
+- 1-24 characters
+- Allowed: letters, spaces, parentheses
+
+## Rate Limiting
+
+There are currently no rate limits on API requests.
+
+## API Endpoints
+
+The API is organized into three main sections:
+
+- **[Currencies](/api/currencies)** - Manage currency definitions
+- **[Exchange Rates](/api/exchange-rates)** - Manage exchange rates between currencies
+- **[Exchange](/api/exchange)** - Convert amounts between currencies

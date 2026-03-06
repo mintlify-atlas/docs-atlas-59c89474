@@ -1,0 +1,366 @@
+---
+title: 'Currency Conversion'
+description: 'Understanding direct, reverse, and cross-rate currency conversion algorithms with precision handling'
+---
+
+## Overview
+
+The Currency Exchange API supports three types of currency conversions: **direct conversion** using existing rates, **reverse conversion** by inverting rates, and **cross-rate conversion** using intermediary currencies. The `ExchangeService` handles the calculation logic with configurable precision.
+
+## ExchangeService
+
+The `ExchangeService` class manages currency conversion calculations:
+
+```csharp CurrencyExchange.Application/Application/ExchangeService.cs
+public class ExchangeService : ICurrencyExchangeService<ExchangeRate>
+{
+    private const int DigitAfterDecimalPoint = 2;
+    public float Amount { get; private set; }
+    public ExchangeRate? ExchangeRate { get; private set; }
+    public float RecalculateAmount { get; private set; }
+}
+```
+
+### Properties
+
+<ResponseField name="Amount" type="float">
+  The original amount to convert
+</ResponseField>
+
+<ResponseField name="ExchangeRate" type="ExchangeRate">
+  The exchange rate used for conversion
+</ResponseField>
+
+<ResponseField name="RecalculateAmount" type="float">
+  The calculated result after conversion
+</ResponseField>
+
+<ResponseField name="DigitAfterDecimalPoint" type="const int">
+  Precision constant set to 2 decimal places for all conversions
+</ResponseField>
+
+## Direct Conversion
+
+Direct conversion uses an existing exchange rate from the database to convert between currencies.
+
+### Calculate Method
+
+```csharp CurrencyExchange.Application/Application/ExchangeService.cs
+public void Calculate(ExchangeRate exchangeRate, float amount)
+{
+    ExchangeRate = exchangeRate
+                   ?? throw new ArgumentNullException(nameof(exchangeRate), "Не задан курс валют!");
+    if (ValidateAmount(amount))
+    {
+        Amount = amount;
+    }
+
+    RecalculateAmount = Convert(ExchangeRate.Rate, Amount);
+}
+```
+
+<Accordion title="Validation Logic">
+  Before performing conversion, the service validates:
+  
+  1. **Exchange rate exists**: Throws `ArgumentNullException` if null
+  2. **Amount is non-negative**: Throws `ArgumentOutOfRangeException` if negative
+  
+  ```csharp
+  private static bool ValidateAmount(float amount)
+  {
+      if (amount < 0)
+      {
+          throw new ArgumentOutOfRangeException(nameof(amount), amount, 
+              "Сумма не может быть меньше нуля!");
+      }
+      return true;
+  }
+  ```
+</Accordion>
+
+### Conversion Formula
+
+The actual conversion multiplies the amount by the exchange rate:
+
+```csharp CurrencyExchange.Application/Application/ExchangeService.cs
+private static float Convert(float rate, float amount)
+{
+    return (float)Math.Round(amount * rate, DigitAfterDecimalPoint, MidpointRounding.ToZero);
+}
+```
+
+<Note>
+  The result is rounded to 2 decimal places using `MidpointRounding.ToZero`, which rounds toward zero when a number is halfway between two others.
+</Note>
+
+### Example
+
+```csharp
+// Convert 100 USD to RUB with rate 75.50
+var service = new ExchangeService();
+var rate = ExchangeRate.Create(1, usdCurrency, rubCurrency, 75.50f);
+service.Calculate(rate, 100f);
+
+// Result: 7550.00 RUB
+Console.WriteLine(service.RecalculateAmount); // 7550.00
+```
+
+## Reverse Conversion
+
+Reverse conversion calculates a missing exchange rate by inverting an existing reverse pair (e.g., calculating USD→EUR from EUR→USD).
+
+### GetAndSaveRevers Method
+
+```csharp CurrencyExchange.Data/Repositories/ExchangeRatesRepository.cs
+public async Task<ExchangeRate?> GetAndSaveRevers(Currency BaseCurrency, Currency TargetCurrency)
+{
+    var reverseRate = await Get(TargetCurrency.Id, BaseCurrency.Id);
+
+    if (reverseRate == null)
+    {
+        return null;
+    }
+
+    if (reverseRate.Rate <= 0)
+    {
+        throw new DivideByZeroException("Курс не может быть меньше или равен нулю!");
+    }
+
+    var newDirectRate = ExchangeRate
+        .Create(0, reverseRate.TargetCurrency, reverseRate.BaseCurrency, 1 / reverseRate.Rate);
+    return await Insert(newDirectRate);
+}
+```
+
+<Accordion title="Algorithm Breakdown">
+  **Step 1:** Search for the reverse pair (Target → Base)
+  
+  **Step 2:** Validate the reverse rate exists and is greater than 0
+  
+  **Step 3:** Calculate the inverted rate using `1 / reverseRate.Rate`
+  
+  **Step 4:** Create and insert the new direct rate into the database
+  
+  **Step 5:** Return the newly created exchange rate
+</Accordion>
+
+### Example
+
+```
+Existing rate: EUR → USD = 1.10
+Requested: USD → EUR
+
+Calculation: 1 / 1.10 = 0.909090...
+Result: USD → EUR = 0.91 (rounded)
+
+The new rate is saved to the database for future use.
+```
+
+<Warning>
+  If the reverse rate is 0 or negative, the method throws a `DivideByZeroException` to prevent invalid calculations.
+</Warning>
+
+## Cross-Rate Conversion
+
+Cross-rate conversion calculates a missing exchange rate using an intermediary currency as a bridge.
+
+### GetAndSaveCross Method
+
+This method iterates through all available currencies to find a common intermediary:
+
+```csharp CurrencyExchange.Data/Repositories/ExchangeRatesRepository.cs
+public async Task<ExchangeRate?> GetAndSaveCross(Currency BaseCurrency, Currency TargetCurrency)
+{
+    var currencies = await GetAll();
+    foreach (var currency in currencies)
+    {
+        var baseRate = await Get(BaseCurrency.Id, currency.Id);
+        var targetRate = await Get(TargetCurrency.Id, currency.Id);
+
+        if (baseRate is not null && targetRate is not null)
+        {
+            var exchangeRate = ExchangeRate.Create(
+                0,
+                BaseCurrency,
+                TargetCurrency,
+                baseRate.Rate / targetRate.Rate
+            );
+            return await Insert(exchangeRate);
+        }
+
+        baseRate = await Get(currency.Id, BaseCurrency.Id);
+        targetRate = await Get(currency.Id, TargetCurrency.Id);
+
+        if (baseRate is not null && targetRate is not null)
+        {
+            var exchangeRate = ExchangeRate.Create(
+                0,
+                BaseCurrency,
+                TargetCurrency,
+                targetRate.Rate / baseRate.Rate
+            );
+            return await Insert(exchangeRate);
+        }
+    }
+
+    return null;
+}
+```
+
+<Accordion title="Cross-Rate Algorithm">
+  The method tries two patterns for each potential intermediary currency (C):
+  
+  **Pattern 1: Both rates from base**
+  - Find: Base → C and Target → C
+  - Calculate: `Base → Target = (Base → C) / (Target → C)`
+  
+  **Pattern 2: Both rates to base**
+  - Find: C → Base and C → Target
+  - Calculate: `Base → Target = (C → Target) / (C → Base)`
+  
+  The first successful match is used to create and save the new rate.
+</Accordion>
+
+### Example Scenarios
+
+<Accordion title="Scenario 1: Common Quote Currency">
+  ```
+  Existing rates:
+  - USD → RUB = 75.00
+  - EUR → RUB = 85.00
+  
+  Requested: USD → EUR
+  Intermediary: RUB
+  
+  Calculation: 75.00 / 85.00 = 0.882352...
+  Result: USD → EUR = 0.88 (rounded)
+  ```
+</Accordion>
+
+<Accordion title="Scenario 2: Common Base Currency">
+  ```
+  Existing rates:
+  - RUB → USD = 0.0133
+  - RUB → EUR = 0.0118
+  
+  Requested: USD → EUR
+  Intermediary: RUB
+  
+  Calculation: 0.0118 / 0.0133 = 0.887218...
+  Result: USD → EUR = 0.89 (rounded)
+  ```
+</Accordion>
+
+<Note>
+  If no suitable intermediary currency is found, the method returns `null`. The API should handle this case by returning an appropriate error to the user.
+</Note>
+
+## Conversion Strategy
+
+The API uses a hierarchical fallback strategy when processing conversion requests:
+
+```csharp CurrencyExchange/Controllers/ExchangeController.cs
+var exchangeRate = await rateRepository.Get(baseCurrency, targetCurrency)
+                   ?? await rateRepository.GetAndSaveRevers(baseCurrency, targetCurrency)
+                   ?? await rateRepository.GetAndSaveCross(baseCurrency, targetCurrency)
+```
+
+1. **Try Direct:** Look for existing Base → Target rate
+2. **Try Reverse:** Calculate from Target → Base rate
+3. **Try Cross-Rate:** Find intermediary currency
+4. **Fail:** Return error if no conversion path exists
+
+<Tip>
+  This strategy minimizes database queries by preferring direct rates while ensuring maximum coverage through reverse and cross-rate fallbacks.
+</Tip>
+
+## Precision and Rounding
+
+All currency conversions use consistent precision rules:
+
+### Decimal Places
+
+```csharp
+private const int DigitAfterDecimalPoint = 2;
+```
+
+All converted amounts are rounded to **2 decimal places**, which is standard for most fiat currencies.
+
+### Rounding Mode
+
+```csharp
+Math.Round(amount * rate, DigitAfterDecimalPoint, MidpointRounding.ToZero)
+```
+
+The API uses `MidpointRounding.ToZero` (truncation toward zero):
+
+| Original Value | Rounded Result |
+|----------------|----------------|
+| 10.125 | 10.12 |
+| 10.135 | 10.13 |
+| 10.145 | 10.14 |
+| 10.155 | 10.15 |
+| -10.125 | -10.12 |
+
+<Warning>
+  This rounding mode differs from standard "round half up" or "banker's rounding". It always rounds toward zero, which may result in slightly different values than other financial systems.
+</Warning>
+
+## Error Handling
+
+### Amount Validation Errors
+
+```csharp
+try
+{
+    service.Calculate(rate, -50f);
+}
+catch (ArgumentOutOfRangeException ex)
+{
+    // Error: "Сумма не может быть меньше нуля!"
+}
+```
+
+### Missing Exchange Rate
+
+```csharp
+try
+{
+    service.Calculate(null, 100f);
+}
+catch (ArgumentNullException ex)
+{
+    // Error: "Не задан курс валют!"
+}
+```
+
+### Division by Zero (Reverse)
+
+```csharp
+try
+{
+    await repository.GetAndSaveRevers(baseCurrency, targetCurrency);
+}
+catch (DivideByZeroException ex)
+{
+    // Error: "Курс не может быть меньше или равен нулю!"
+}
+```
+
+## Best Practices
+
+<Card title="Validate Input Amounts" icon="check-circle">
+  Always validate user input before calling conversion methods to provide clear error messages.
+</Card>
+
+<Card title="Cache Exchange Rates" icon="database">
+  Once calculated, reverse and cross rates are saved to the database, improving performance for subsequent requests.
+</Card>
+
+<Card title="Monitor Cross-Rate Accuracy" icon="chart-line">
+  Cross-rate conversions may accumulate small rounding errors. Consider refreshing rates from authoritative sources periodically.
+</Card>
+
+<Card title="Handle Null Returns" icon="exclamation-circle">
+  The cross-rate method can return `null` if no conversion path exists. Always check for null and provide appropriate user feedback.
+</Card>

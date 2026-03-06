@@ -1,97 +1,108 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Currency Exchange API"
+description: "A powerful REST API for managing currencies, exchange rates, and performing currency conversions with automatic rate updates."
 ---
 
-## Setting up
+## Welcome to Currency Exchange API
 
-Get your documentation site up and running in minutes.
+A production-ready REST API service built with .NET 8 that provides comprehensive currency management and conversion capabilities. The API features automatic exchange rate updates from the Central Bank of Russia and supports sophisticated conversion algorithms including direct, reverse, and cross-rate calculations.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
+<CardGroup cols={2}>
   <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
   >
-    Edit your docs locally and preview them in real time.
+    Get started with the Currency Exchange API in minutes
   </Card>
   <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
+    title="Architecture"
+    icon="sitemap"
+    href="/architecture"
   >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+    Understand the clean architecture and design patterns
   </Card>
   <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
+    title="API Reference"
     icon="code"
-    href="/essentials/code"
+    href="/api/overview"
   >
-    Add sample code to demonstrate how to use your product.
+    Explore all available endpoints and data models
   </Card>
   <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
+    title="Deployment"
+    icon="docker"
+    href="/deployment/docker"
   >
-    Display images and other media.
+    Deploy with Docker and configure for production
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Currency Management"
+    icon="coins"
+    href="/concepts/currencies"
+  >
+    Create, retrieve, and search currencies with validation
   </Card>
   <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
+    title="Exchange Rates"
+    icon="chart-line"
+    href="/concepts/exchange-rates"
   >
-    Write once and reuse across your docs.
+    Manage exchange rates with automatic updates from CBR
   </Card>
-</Columns>
+  <Card
+    title="Smart Conversions"
+    icon="arrows-rotate"
+    href="/concepts/currency-conversion"
+  >
+    Convert currencies using direct, reverse, or cross-rate algorithms
+  </Card>
+  <Card
+    title="Clean Architecture"
+    icon="layer-group"
+    href="/architecture"
+  >
+    Built with separation of concerns and SOLID principles
+  </Card>
+</CardGroup>
 
-## Need inspiration?
+## Quick Example
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+Convert 100 USD to EUR using the API:
+
+```bash
+curl "http://localhost:8080/api/Exchange/from=USD&to=EUR&amount=100"
+```
+
+```json Response
+{
+  "baseCurrency": {
+    "id": 1,
+    "code": "USD",
+    "fullName": "United States Dollar",
+    "sign": "$"
+  },
+  "targetCurrency": {
+    "id": 2,
+    "code": "EUR",
+    "fullName": "Euro",
+    "sign": "€"
+  },
+  "rate": 0.92,
+  "amount": 100,
+  "convertedAmount": 92.00
+}
+```
+
+## Technology Stack
+
+- **.NET 8** - Modern, high-performance framework
+- **PostgreSQL** - Reliable relational database
+- **Entity Framework Core** - Powerful ORM with migrations
+- **Swagger/OpenAPI** - Interactive API documentation
+- **Docker** - Container-based deployment

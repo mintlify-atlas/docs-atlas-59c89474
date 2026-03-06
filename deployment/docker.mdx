@@ -1,0 +1,310 @@
+---
+title: 'Docker Deployment'
+description: 'Deploy the Currency Exchange API using Docker and Docker Compose'
+---
+
+The Currency Exchange API is containerized using Docker, making it easy to deploy and run in any environment.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- Docker (version 20.x or higher)
+- Docker Compose (version 2.x or higher)
+
+## Docker Configuration
+
+The API uses a multi-stage Dockerfile based on .NET 8.0 to optimize the image size and build process.
+
+### Dockerfile Overview
+
+The Dockerfile consists of four stages:
+
+1. **Base Stage**: Sets up the runtime environment
+2. **Build Stage**: Compiles the application
+3. **Publish Stage**: Publishes the release build
+4. **Final Stage**: Creates the production image
+
+```dockerfile
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+USER $APP_UID
+WORKDIR /app
+EXPOSE 8080
+EXPOSE 8081
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
+WORKDIR /src
+COPY [".", "./"]
+RUN dotnet restore "./CurrencyExchange/CurrencyExchange.API.csproj"
+COPY . .
+WORKDIR "/src/"
+RUN dotnet build "./CurrencyExchange/CurrencyExchange.API.csproj" -c $BUILD_CONFIGURATION -o /app/build
+
+FROM build AS publish
+ARG BUILD_CONFIGURATION=Release
+RUN dotnet publish "./CurrencyExchange/CurrencyExchange.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "CurrencyExchange.API.dll"]
+```
+
+## Building the Docker Image
+
+<Steps>
+  <Step title="Navigate to the source directory">
+    ```bash
+    cd /path/to/source
+    ```
+  </Step>
+
+  <Step title="Build the Docker image">
+    ```bash
+    docker build -t currencyexchangeback .
+    ```
+    
+    This command builds the image using the Dockerfile in the current directory and tags it as `currencyexchangeback`.
+  </Step>
+
+  <Step title="Verify the image">
+    ```bash
+    docker images | grep currencyexchangeback
+    ```
+  </Step>
+</Steps>
+
+## Running with Docker Compose
+
+The `docker-compose.yaml` file defines the services needed to run the application, including the PostgreSQL database.
+
+### Docker Compose Configuration
+
+```yaml
+services:
+  postgres:
+    image: postgres:17
+    container_name: currencies-bd
+    environment:
+      POSTGRES_DB: "currencies"
+      POSTGRES_USER: "alexpg"
+      POSTGRES_PASSWORD: ${password}
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ../2. Init Database:/docker-entrypoint-initdb.d
+      - currencies:/var/lib/postgresql/data
+
+volumes:
+  currencies:
+```
+
+<Note>
+The docker-compose file includes commented-out sections for nginx reverse proxy and frontend services. Uncomment these sections if you need to deploy the full stack.
+</Note>
+
+### Starting the Services
+
+<Steps>
+  <Step title="Set the database password">
+    Create a `.env` file in the same directory as `docker-compose.yaml`:
+    
+    ```bash
+    password=your_secure_password
+    ```
+    
+    <Warning>
+    Make sure to use a strong password and never commit the `.env` file to version control.
+    </Warning>
+  </Step>
+
+  <Step title="Start the PostgreSQL database">
+    ```bash
+    docker-compose up -d postgres
+    ```
+    
+    This starts only the PostgreSQL service in detached mode.
+  </Step>
+
+  <Step title="Run the API container">
+    ```bash
+    docker run -d \
+      --name currencies-backend \
+      --network host \
+      -p 8080:8080 \
+      currencyexchangeback
+    ```
+  </Step>
+
+  <Step title="Verify the services are running">
+    ```bash
+    docker ps
+    ```
+    
+    You should see both the `currencies-bd` and `currencies-backend` containers running.
+  </Step>
+</Steps>
+
+## Port Mappings
+
+The following ports are exposed by the services:
+
+| Service | Container Port | Host Port | Description |
+|---------|---------------|-----------|-------------|
+| API | 8080 | 8080 | HTTP endpoint for the API |
+| API | 8081 | 8081 | HTTPS endpoint (optional) |
+| PostgreSQL | 5432 | 5432 | Database connection port |
+
+## Volumes
+
+### Database Volume
+
+The PostgreSQL database uses a named volume `currencies` to persist data:
+
+```yaml
+volumes:
+  currencies:
+```
+
+This ensures that your database data survives container restarts and removals.
+
+### Initialization Scripts
+
+Database initialization scripts are mounted from the host:
+
+```yaml
+volumes:
+  - ../2. Init Database:/docker-entrypoint-initdb.d
+```
+
+Place your SQL initialization scripts in the `../2. Init Database` directory, and they will be executed automatically when the database container starts for the first time.
+
+## Full Stack Deployment
+
+To deploy the complete stack including the API, frontend, and nginx reverse proxy, uncomment the relevant sections in `docker-compose.yaml`:
+
+```yaml
+networks:
+  currencies-network:
+    driver: bridge
+
+services:
+  nginx:
+    image: nginx:stable-alpine
+    container_name: currencies-proxy
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:3000"
+    restart: always
+    networks:
+      - currencies-network
+    depends_on:
+      - app
+
+  front:
+    image: currencyexchangefront
+    container_name: currencies-frontend
+    expose:
+      - "4200"
+    restart: always
+    networks:
+      - currencies-network
+    depends_on:
+      - app
+
+  app:
+    image: currencyexchangeback
+    container_name: currencies-backend
+    expose:
+      - "8080"
+    networks:
+      - currencies-network
+    depends_on:
+      - postgres
+
+  postgres:
+    # ... existing postgres configuration ...
+    networks:
+      - currencies-network
+```
+
+Then start all services:
+
+```bash
+docker-compose up -d
+```
+
+## Stopping and Removing Services
+
+<CodeGroup>
+```bash Stop Services
+docker-compose stop
+```
+
+```bash Stop and Remove
+docker-compose down
+```
+
+```bash Remove with Volumes
+docker-compose down -v
+```
+</CodeGroup>
+
+<Warning>
+Using `docker-compose down -v` will delete all data in the database volume. Only use this command if you want to completely reset the application.
+</Warning>
+
+## Troubleshooting
+
+### Viewing Logs
+
+<CodeGroup>
+```bash API Logs
+docker logs currencies-backend
+```
+
+```bash Database Logs
+docker logs currencies-bd
+```
+
+```bash Follow Logs
+docker logs -f currencies-backend
+```
+</CodeGroup>
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Port already in use">
+    If port 8080 or 5432 is already in use, modify the port mappings in `docker-compose.yaml` or the docker run command:
+    
+    ```yaml
+    ports:
+      - "5433:5432"  # Use host port 5433 instead
+    ```
+  </Accordion>
+
+  <Accordion title="Database connection refused">
+    Ensure the PostgreSQL container is running and healthy:
+    
+    ```bash
+    docker ps
+    docker logs currencies-bd
+    ```
+    
+    Check that the connection string in `appsettings.json` matches the database configuration.
+  </Accordion>
+
+  <Accordion title="Container exits immediately">
+    Check the container logs for errors:
+    
+    ```bash
+    docker logs currencies-backend
+    ```
+    
+    Common causes include missing environment variables or database connection issues.
+  </Accordion>
+</AccordionGroup>

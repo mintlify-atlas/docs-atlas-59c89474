@@ -1,80 +1,323 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get the Currency Exchange API running locally in minutes using Docker
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
+Before you begin, ensure you have the following installed:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Docker" icon="docker">
+    Version 20.10 or higher
+  </Card>
+  <Card title="Docker Compose" icon="layer-group">
+    Version 2.0 or higher
+  </Card>
+  <Card title=".NET 8 SDK" icon="code">
+    Required for local development (optional for Docker)
+  </Card>
+  <Card title="PostgreSQL Client" icon="terminal">
+    psql or any PostgreSQL client for database setup
+  </Card>
 </CardGroup>
 
+## Setup Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the project and navigate to the source directory:
+    
+    ```bash
+    git clone <repository-url>
+    cd CurrencyExchange
+    ```
+  </Step>
+  
+  <Step title="Configure Environment Variables">
+    Create a `.env` file in the project root with your PostgreSQL password:
+    
+    ```bash
+    password=your_secure_password
+    ```
+    
+    <Note>
+      The default configuration uses `alexpg` as the username and `currencies` as the database name. These can be modified in `docker-compose.yaml`.
+    </Note>
+  </Step>
+  
+  <Step title="Start PostgreSQL with Docker Compose">
+    Launch the PostgreSQL container:
+    
+    ```bash
+    docker compose up -d
+    ```
+    
+    This will start PostgreSQL on port 5432 with a persistent volume named `currencies`.
+  </Step>
+  
+  <Step title="Initialize the Database">
+    Connect to PostgreSQL and create the required tables:
+    
+    ```bash
+    psql -h localhost -U alexpg -d currencies
+    ```
+    
+    Run the following SQL commands from `data.sql`:
+    
+    ```sql
+    -- Create tables
+    CREATE TABLE currencies (
+      id SERIAL PRIMARY KEY, 
+      code VARCHAR(400), 
+      fullname VARCHAR(400), 
+      sign VARCHAR(400)
+    );
+    
+    CREATE TABLE exchangerates (
+      id SERIAL PRIMARY KEY, 
+      basecurrencyid INT REFERENCES currencies(id), 
+      targetcurrencyid INT REFERENCES currencies(id), 
+      rate REAL
+    );
+    
+    -- Add unique indexes
+    CREATE UNIQUE INDEX ix_code ON currencies (code);
+    CREATE UNIQUE INDEX ix_currencyids ON exchangerates (basecurrencyid, targetcurrencyid);
+    
+    -- Insert sample data
+    INSERT INTO currencies (code, fullname, sign) 
+    VALUES 
+      ('USD', 'US Dollar', '$'),
+      ('RUB', 'Russian Ruble', '₽');
+    
+    INSERT INTO exchangerates (basecurrencyid, targetcurrencyid, rate) 
+    VALUES 
+      (1, 2, 82.25),  -- USD to RUB
+      (2, 1, 0.012);  -- RUB to USD
+    ```
+  </Step>
+  
+  <Step title="Build and Run the API">
+    Build the Docker image and run the application:
+    
+    ```bash
+    docker build -t currencyexchangeback .
+    docker run -d -p 8080:8080 --name currencies-backend currencyexchangeback
+    ```
+    
+    Alternatively, run locally with .NET:
+    
+    ```bash
+    cd CurrencyExchange
+    dotnet restore
+    dotnet run
+    ```
+    
+    The API will be available at `http://localhost:8080`
+  </Step>
+  
+  <Step title="Verify Installation">
+    Open Swagger UI in your browser:
+    
+    ```
+    http://localhost:8080/swagger
+    ```
+    
+    You should see the interactive API documentation.
+  </Step>
+</Steps>
+
+## Your First API Call
+
+Let's perform a currency conversion from USD to RUB:
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:8080/api/Exchange/from=USD&to=RUB&amount=100" \
+  -H "accept: application/json"
+```
+
+```javascript JavaScript
+fetch('http://localhost:8080/api/Exchange/from=USD&to=RUB&amount=100')
+  .then(response => response.json())
+  .then(data => console.log(data));
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    'http://localhost:8080/api/Exchange/from=USD&to=RUB&amount=100'
+)
+print(response.json())
+```
+
+```csharp C#
+using var client = new HttpClient();
+var response = await client.GetAsync(
+    "http://localhost:8080/api/Exchange/from=USD&to=RUB&amount=100"
+);
+var result = await response.Content.ReadAsStringAsync();
+Console.WriteLine(result);
+```
+</CodeGroup>
+
+### Expected Response
+
+```json
+{
+  "baseCurrency": {
+    "id": 1,
+    "code": "USD",
+    "fullName": "US Dollar",
+    "sign": "$"
+  },
+  "targetCurrency": {
+    "id": 2,
+    "code": "RUB",
+    "fullName": "Russian Ruble",
+    "sign": "₽"
+  },
+  "rate": 82.25,
+  "amount": 100,
+  "recalculateAmount": 8225.00
+}
+```
+
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  The conversion endpoint is defined in `ExchangeController.cs:16`. It intelligently handles direct rates, reverse rates, and cross-rates automatically.
 </Note>
+
+## Additional API Endpoints
+
+Try these other endpoints to explore the API:
+
+### Get All Currencies
+
+```bash
+curl -X GET "http://localhost:8080/api/Currency" \
+  -H "accept: application/json"
+```
+
+### Search Currencies
+
+```bash
+curl -X GET "http://localhost:8080/api/Currency/Dollar" \
+  -H "accept: application/json"
+```
+
+### Get All Exchange Rates
+
+```bash
+curl -X GET "http://localhost:8080/api/ExchangeRate" \
+  -H "accept: application/json"
+```
+
+### Add a New Currency
+
+```bash
+curl -X POST "http://localhost:8080/api/Currency" \
+  -H "accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": 0,
+    "code": "EUR",
+    "fullName": "Euro",
+    "sign": "€"
+  }'
+```
+
+### Add an Exchange Rate
+
+```bash
+curl -X POST "http://localhost:8080/api/ExchangeRate" \
+  -H "accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "baseCurrencyCode": "EUR",
+    "targetCurrencyCode": "USD",
+    "rate": 1.08
+  }'
+```
+
+## Configuration
+
+### Automatic Rate Updates
+
+The API automatically updates exchange rates from the Central Bank of Russia. Configure the update frequency in `appsettings.json`:
+
+```json appsettings.json
+{
+  "CurrencyReceiptPeriod": {
+    "Period": "300"  // Update every 300 seconds (5 minutes)
+  }
+}
+```
+
+The background service is configured in `Program.cs:29-33` using the `CBRExchangeRate` hosted service.
+
+### CORS Configuration
+
+If you're building a frontend application, configure allowed origins in `appsettings.json`:
+
+```json appsettings.json
+{
+  "CorsConfig": {
+    "Origin": [
+      "http://localhost:4200",
+      "https://your-frontend-domain.com"
+    ]
+  }
+}
+```
+
+### Database Connection
+
+Modify the connection string in `appsettings.json` if needed:
+
+```json appsettings.json
+{
+  "ConnectionStrings": {
+    "CurrencyExchangeDBContext": "Host=localhost;Database=currencies;Port=5432;User ID=alexpg;Password=your_password;CommandTimeout=1200;"
+  }
+}
+```
+
+<Note>
+  For Docker deployment, use `Host=postgres` instead of `Host=localhost` to connect to the PostgreSQL container.
+</Note>
+
+## Troubleshooting
+
+### Database Connection Errors
+
+If you see connection errors, ensure:
+- PostgreSQL container is running: `docker ps`
+- Connection string matches your configuration
+- Database and tables are created
+
+### Rate Updates Not Working
+
+The automatic rate update service (`CBRExchangeRate.cs:13`) requires:
+- Currency pairs with format `[CURRENCY_CODE]` → `RUB` in the database
+- Network access to the Central Bank of Russia SOAP service
+- Valid currency codes matching CBR's currency list
+
+### Validation Errors
+
+The API validates:
+- Currency codes: 3-5 uppercase letters (validated in `Currency.cs:25`)
+- Currency names: 3-60 characters, letters and spaces only
+- Exchange rates: Must be between 0 and 99,999,999 (validated in `ExchangeRate.cs:28-31`)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="diagram-project" href="/architecture">
+    Understand the clean architecture design and layer responsibilities
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/overview">
+    Explore all available endpoints and their parameters
+  </Card>
+</CardGroup>

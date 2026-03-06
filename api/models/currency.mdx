@@ -1,0 +1,144 @@
+---
+title: "Currency"
+description: "Currency model and data transfer objects"
+---
+
+## Currency Model
+
+The `Currency` class represents a currency in the system with its code, full name, and symbol.
+
+### Class Structure
+
+```csharp
+public class Currency
+{
+    public int Id { get; }
+    public string Code { get; }
+    public string FullName { get; }
+    public string Sign { get; }
+}
+```
+
+### Properties
+
+<ResponseField name="Id" type="integer" required>
+  Unique identifier for the currency
+</ResponseField>
+
+<ResponseField name="Code" type="string" required>
+  Currency code (e.g., USD, EUR, RUB)
+  
+  **Validation:**
+  - Length: 3-5 characters
+  - Format: Uppercase letters only (A-Z)
+  - Pattern: `[^A-Z]` (no characters other than uppercase letters)
+  - Automatically converted to uppercase
+</ResponseField>
+
+<ResponseField name="FullName" type="string" required>
+  Full name of the currency (e.g., US Dollar, Euro)
+  
+  **Validation:**
+  - Length: 3-60 characters
+  - Allowed characters: Latin letters (A-Z, a-z), Cyrillic letters (А-Я, а-я, Ё, ё), parentheses, and spaces
+  - Pattern: `[^A-Za-zА-Яа-яЁё() ]` (no characters outside the allowed set)
+</ResponseField>
+
+<ResponseField name="Sign" type="string" required>
+  Currency symbol (e.g., $, €, ₽)
+  
+  **Validation:**
+  - Length: 1-3 characters
+  - Pattern: `[ \n]` (no spaces or newlines allowed)
+</ResponseField>
+
+<Note>
+  All currency fields are validated on creation. Empty or null values will result in an error. The validation ensures data integrity and consistent formatting across the system.
+</Note>
+
+## CurrencyDTO
+
+Data transfer object used for API responses.
+
+### TypeScript Definition
+
+```typescript
+interface CurrencyDTO {
+  ID: number;
+  Code: string;
+  FullName: string;
+  Sign: string;
+}
+```
+
+### Properties
+
+<ResponseField name="ID" type="integer" required>
+  Unique identifier for the currency
+</ResponseField>
+
+<ResponseField name="Code" type="string" required>
+  Currency code in uppercase format (3-5 characters)
+</ResponseField>
+
+<ResponseField name="FullName" type="string" required>
+  Full name of the currency (3-60 characters)
+</ResponseField>
+
+<ResponseField name="Sign" type="string" required>
+  Currency symbol (1-3 characters)
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "ID": 1,
+  "Code": "USD",
+  "FullName": "US Dollar",
+  "Sign": "$"
+}
+```
+
+## Validation Rules Summary
+
+| Field | Min Length | Max Length | Allowed Characters | Notes |
+|-------|-----------|------------|-------------------|-------|
+| Code | 3 | 5 | A-Z (uppercase only) | Auto-converted to uppercase |
+| FullName | 3 | 60 | A-Z, a-z, А-Я, а-я, Ё, ё, (), space | Latin and Cyrillic letters, parentheses, spaces |
+| Sign | 1 | 3 | Any except space and newline | Currency symbols |
+
+## Additional Examples
+
+### USD Currency
+
+```json
+{
+  "ID": 1,
+  "Code": "USD",
+  "FullName": "US Dollar",
+  "Sign": "$"
+}
+```
+
+### EUR Currency
+
+```json
+{
+  "ID": 2,
+  "Code": "EUR",
+  "FullName": "Euro",
+  "Sign": "€"
+}
+```
+
+### RUB Currency
+
+```json
+{
+  "ID": 3,
+  "Code": "RUB",
+  "FullName": "Российский рубль",
+  "Sign": "₽"
+}
+```

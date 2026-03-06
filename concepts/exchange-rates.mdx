@@ -1,0 +1,273 @@
+---
+title: 'Exchange Rates'
+description: 'Managing exchange rates, automatic updates from CBR, and rate constraints in the Currency Exchange API'
+---
+
+## Overview
+
+Exchange rates define the conversion ratio between two currencies. The Currency Exchange API manages exchange rates with strict validation, supports automatic updates from the Central Bank of Russia (CBR), and provides flexible rate management capabilities.
+
+## ExchangeRate Model Structure
+
+The `ExchangeRate` class represents a currency pair with its conversion rate:
+
+```csharp CurrencyExchange.Core/Models/ExchangeRate.cs
+public class ExchangeRate
+{
+    private ExchangeRate(int id, Currency baseCurrency, Currency targetCurrency, float rate)
+    {
+        Id = id;
+        BaseCurrency = baseCurrency;
+        TargetCurrency = targetCurrency;
+        Rate = rate;
+    }
+
+    public const int MIN_RATE = 0;
+    public const int MAX_RATE = 99999999;
+    
+    public int Id { get; }
+    public Currency BaseCurrency { get; }
+    public Currency TargetCurrency { get; }
+    public float Rate { get; }
+}
+```
+
+### Properties
+
+<ResponseField name="Id" type="int" required>
+  Unique identifier for the exchange rate
+</ResponseField>
+
+<ResponseField name="BaseCurrency" type="Currency" required>
+  The source currency for conversion
+</ResponseField>
+
+<ResponseField name="TargetCurrency" type="Currency" required>
+  The destination currency for conversion
+</ResponseField>
+
+<ResponseField name="Rate" type="float" required>
+  The conversion rate from base to target currency. Must be greater than 0 and less than or equal to 99,999,999.
+</ResponseField>
+
+## Rate Constraints
+
+Exchange rates must satisfy strict numeric constraints to prevent invalid conversions:
+
+<Accordion title="Minimum Rate Constraint">
+  **Value:** Greater than 0
+  
+  Exchange rates cannot be zero or negative. This prevents division by zero errors and ensures meaningful conversions.
+  
+  ```csharp
+  public const int MIN_RATE = 0;
+  
+  if (rate <= MIN_RATE) 
+      throw new ArgumentException($"Курс не может быть меньше или равен {MIN_RATE}!");
+  ```
+  
+  <Warning>
+    Attempting to create an exchange rate with a value of 0 or below will throw an `ArgumentException`.
+  </Warning>
+</Accordion>
+
+<Accordion title="Maximum Rate Constraint">
+  **Value:** 99,999,999 or less
+  
+  This upper limit prevents overflow issues and constrains rates to realistic values.
+  
+  ```csharp
+  public const int MAX_RATE = 99999999;
+  
+  if (rate > MAX_RATE) 
+      throw new ArgumentException($"Курс не может быть больше {MAX_RATE}!");
+  ```
+</Accordion>
+
+## Creating Exchange Rates
+
+Exchange rates are created using the static `Create` method with automatic validation:
+
+```csharp CurrencyExchange.Core/Models/ExchangeRate.cs
+public static ExchangeRate Create(int id, Currency baseCurrency, Currency targetCurrency, float rate)
+{
+    Validate(rate);
+    
+    return new ExchangeRate(id, baseCurrency, targetCurrency, rate);
+}
+
+public static void Validate(float rate)
+{
+    if (rate <= MIN_RATE) throw new ArgumentException($"Курс не может быть меньше или равен {MIN_RATE}!");
+    if (rate > MAX_RATE) throw new ArgumentException($"Курс не может быть больше {MAX_RATE}!");
+}
+```
+
+<Note>
+  The validation method is called automatically within the `Create` method, ensuring all exchange rates meet the required constraints.
+</Note>
+
+## Automatic Updates from CBR
+
+The Currency Exchange API includes a background service that automatically fetches and updates exchange rates from the Central Bank of Russia (CBR) web service.
+
+### CBRExchangeRate Background Service
+
+The `CBRExchangeRate` class implements `IHostedService` to run as a background worker:
+
+```csharp CurrencyExchange.Data/ExternalServices/Clients/CBRExchangeRate.cs
+public class CBRExchangeRate(
+    IServiceScopeFactory scopeFactory,
+    int delaySeconds) : IHostedService, IAsyncDisposable
+{
+    private static Timer? _timer;
+    private List<CBRExchangeRateEntity> CBRExchangeRates { get; } = [];
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _timer = new Timer(Update, null, TimeSpan.Zero, TimeSpan.FromSeconds(delaySeconds));
+        return _completedTask;
+    }
+}
+```
+
+<Accordion title="Service Configuration">
+  The background service is configured with a delay interval (in seconds) that determines how frequently rates are updated.
+  
+  **Parameters:**
+  - `scopeFactory`: Service scope factory for dependency injection
+  - `delaySeconds`: Update interval in seconds
+  
+  The timer starts immediately (`TimeSpan.Zero`) and repeats at the configured interval.
+</Accordion>
+
+### Fetching Rates from CBR
+
+The service retrieves daily currency rates from the CBR SOAP API:
+
+```csharp CurrencyExchange.Data/ExternalServices/Clients/CBRExchangeRate.cs
+private async Task GetFromCBR()
+{
+    using var scope = ScopeFactory.CreateScope();
+    var client = scope.ServiceProvider.GetRequiredService<DailyInfoSoapClient>();
+    var daily = await client.GetCursOnDateAsync(DateTime.Now);
+    var nodes = daily.Nodes[1].Element("ValuteData");
+    if (nodes == null) return;
+    foreach (var node in nodes.Elements("ValuteCursOnDate"))
+    {
+        var code = node.Element("VchCode").Value;
+        var name = node.Element("Vname").Value.Trim();
+        var rate = float.Parse(node.Element("VunitRate").Value, CultureInfo.InvariantCulture);
+        CBRExchangeRates.Add(new CBRExchangeRateEntity(code, name, rate));
+    }
+}
+```
+
+<Tip>
+  The service uses `CultureInfo.InvariantCulture` when parsing rates to ensure consistent decimal formatting regardless of server locale.
+</Tip>
+
+### Updating Existing Rates
+
+The update process checks for existing currency pairs and updates their rates:
+
+```csharp CurrencyExchange.Data/ExternalServices/Clients/CBRExchangeRate.cs
+private async void Update(object? state)
+{
+    using var scope = ScopeFactory.CreateScope();
+    var exchangeRateRepository = scope.ServiceProvider.GetRequiredService<IExchangeRateRepository<ExchangeRate>>();
+    await GetFromCBR();
+    if (CBRExchangeRates.Count == 0) return;
+    foreach (var exchangeRateCBR in CBRExchangeRates)
+    {
+        var exist = await exchangeRateRepository
+            .CheckExist(exchangeRateCBR.BaseCurrencyCode, exchangeRateCBR.TargetCurrencyCode);
+        if (exist)
+        {
+            await exchangeRateRepository
+                .Update(exchangeRateCBR.BaseCurrencyCode, 
+                    exchangeRateCBR.TargetCurrencyCode, 
+                    exchangeRateCBR.Rate);
+            Console.WriteLine("Обновил!");
+        }
+    }
+}
+```
+
+<Note>
+  The service only updates existing currency pairs. New pairs from CBR are not automatically added to the database.
+</Note>
+
+## Managing Exchange Rates
+
+### Checking Rate Existence
+
+Before updating or inserting rates, verify they exist in the database:
+
+```csharp CurrencyExchange.Data/Repositories/ExchangeRatesRepository.cs
+public async Task<bool> CheckExist(string baseCurrencyCode, string targetCurrencyCode)
+{
+    return await dbContext.ExchangeRates
+        .AnyAsync(er =>
+            er.BaseCurrency.Code == baseCurrencyCode &&
+            er.TargetCurrency.Code == targetCurrencyCode);
+}
+```
+
+### Updating Rates
+
+Update existing exchange rates by currency codes:
+
+```csharp CurrencyExchange.Data/Repositories/ExchangeRatesRepository.cs
+public async Task Update(string baseCurrencyCode, string targetCurrencyCode, float rate)
+{
+    var checkExistence = await CheckExist(baseCurrencyCode, targetCurrencyCode);
+    if (!checkExistence)
+    {
+        throw new InvalidOperationException("Валютная пара не найдена");
+    }
+
+    var exchangeRate = await dbContext.ExchangeRates
+        .Where(b => baseCurrencyCode == b.BaseCurrency.Code &&
+                    targetCurrencyCode == b.TargetCurrency.Code)
+        .ExecuteUpdateAsync(set => set.SetProperty(s => s.Rate, rate));
+    await dbContext.SaveChangesAsync();
+}
+```
+
+## Same Currency Exchange Rate
+
+When base and target currencies are identical, the API automatically returns a rate of 1.0:
+
+```csharp CurrencyExchange.Data/Repositories/ExchangeRatesRepository.cs
+if (baseCurrencyId == targetCurrencyId)
+{
+    var currency = await dbContext.Currencies
+        .Where(c => c.Id == baseCurrencyId)
+        .FirstAsync();
+    return ExchangeRate.Create(
+        0,
+        Currency.Create(currency.Id, currency.Code, currency.FullName, currency.Sign),
+        Currency.Create(currency.Id, currency.Code, currency.FullName, currency.Sign),
+        1
+    );
+}
+```
+
+<Tip>
+  This automatic handling simplifies currency conversion logic when dealing with same-currency scenarios.
+</Tip>
+
+## Best Practices
+
+<Card title="Monitor Background Updates" icon="clock">
+  Configure the CBR update interval based on your application's needs. More frequent updates increase accuracy but consume more resources.
+</Card>
+
+<Card title="Validate Before Insert" icon="shield-check">
+  Always check if a currency pair already exists before inserting to avoid duplicate key errors.
+</Card>
+
+<Card title="Handle Update Failures" icon="triangle-exclamation">
+  Implement proper error handling for CBR service failures, as network issues or API changes can cause update errors.
+</Card>
