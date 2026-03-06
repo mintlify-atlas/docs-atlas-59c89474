@@ -1,0 +1,82 @@
+{
+  "projectType": "api-service",
+  "projectName": "Currency Exchange API",
+  "projectDescription": "A REST API service for managing currencies, exchange rates, and performing currency conversions with automatic rate updates from the Central Bank of Russia.",
+  "theme": "aspen",
+  "primaryColor": "#2E7D32",
+  "lightColor": "#66BB6A",
+  "darkColor": "#1B5E20",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/docker",
+              "deployment/configuration",
+              "deployment/database"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/currencies",
+              "concepts/exchange-rates",
+              "concepts/currency-conversion"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/overview",
+              "api/currencies",
+              "api/exchange-rates",
+              "api/exchange"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/currency",
+              "api/models/exchange-rate"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "REST API for currency and exchange rate management",
+    "Automatic exchange rate updates from Central Bank of Russia",
+    "Support for direct, reverse, and cross-rate currency conversions",
+    "PostgreSQL database with Entity Framework Core",
+    "Clean architecture with separation of concerns",
+    "Docker containerization support",
+    "Swagger/OpenAPI documentation"
+  ],
+  "publicApiSurface": [
+    "GET /api/Currency - Get all currencies",
+    "GET /api/Currency/{searchString} - Search currencies",
+    "POST /api/Currency - Create a new currency",
+    "GET /api/ExchangeRate - Get all exchange rates",
+    "GET /api/ExchangeRate/{searchString} - Search exchange rates",
+    "POST /api/ExchangeRate - Create a new exchange rate",
+    "PATCH /api/ExchangeRate/{baseCurrencyCode}&{targetCurrencyCode} - Update exchange rate",
+    "GET /api/Exchange/from={baseCurrencyCode}&to={targetCurrencyCode}&amount={amount} - Convert currency"
+  ]
+}
